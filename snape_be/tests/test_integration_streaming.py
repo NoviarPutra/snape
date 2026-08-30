@@ -1,4 +1,6 @@
 import time
+from collections.abc import AsyncGenerator
+from typing import Any
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -118,11 +120,14 @@ async def test_multi_turn_history_buffering(db_session: AsyncSession) -> None:
     # Track received system prompts and contents across turns
     class InspectingLLMService(BaseLLMService):
         def __init__(self) -> None:
-            self.calls: list[dict] = []
+            self.calls: list[dict[str, Any]] = []
 
         async def stream_chat(
-            self, system_instruction: str, contents: list, temperature: float = 0.7
-        ):
+            self,
+            system_instruction: str,
+            contents: list[dict[str, Any]],
+            temperature: float = 0.7,
+        ) -> AsyncGenerator[str, None]:
             self.calls.append({
                 "system_instruction": system_instruction,
                 "contents": contents,

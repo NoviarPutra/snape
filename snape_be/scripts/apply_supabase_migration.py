@@ -42,7 +42,7 @@ if "ssl=require" in DATABASE_URL:
     DATABASE_URL = DATABASE_URL.replace("ssl=require", "sslmode=require")
 
 
-def apply_migration():
+def apply_migration() -> None:
     try:
         import psycopg2
     except ImportError:
@@ -50,7 +50,13 @@ def apply_migration():
         sys.exit(1)
 
     parsed = urlparse(DATABASE_URL)
-    print(f"Connecting to database host: {parsed.hostname}...")
+    raw_host = parsed.hostname
+    host_str = (
+        raw_host.decode("utf-8")
+        if isinstance(raw_host, bytes)
+        else (raw_host or "")
+    )
+    print(f"Connecting to database host: {host_str}...")
 
     if not MIGRATION_FILE.exists():
         print(f"❌ Migration file not found at: {MIGRATION_FILE}")

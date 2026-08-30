@@ -1,5 +1,11 @@
+from uuid import UUID
+
 import pytest
 from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.schemas.memory import MemoryCreate
+from app.services.memory_service import get_memory_service
 
 
 @pytest.mark.asyncio
@@ -86,3 +92,79 @@ async def test_session_lifecycle_endpoints(client: AsyncClient) -> None:
     # 6. Verify deleted session gives 404
     get_deleted = await client.get(f"/api/v1/sessions/{session_id}")
     assert get_deleted.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_memory_endpoints(client: AsyncClient, db_session: AsyncSession) -> None:
+    """Test GET /api/v1/memories and DELETE /api/v1/memories/{id} endpoints."""
+    # 1. Initially empty memories list
+    list_res = await client.get("/api/v1/memories")
+    assert list_res.status_code == 200
+    assert list_res.json() == []
+
+    # 2. Add memories via memory service directly
+    user_res = await client.get("/api/v1/user")
+    assert user_res.status_code == 200
+    user_id = UUID(user_res.json()["id"])
+
+    mem_service = get_memory_service()
+    emb1 = await mem_service.embedding_service.generate_embedding(
+        "Enjoys hiking on mountains"
+    )
+    emb2 = await mem_service.embedding_service.generate_embedding(
+        "Wants to pass IELTS with band 7.5"
+    )
+
+    mem1 = await mem_service.create_memory(
+        db_session,
+        user_id=user_id,
+        memory_in=MemoryCreate(
+            user_id=user_id,
+            category="preference",
+            content="Enjoys hiking on mountains",
+            embedding=emb1,
+        ),
+    )
+    mem2 = await mem_service.create_memory(
+        db_session,
+        user_id=user_id,
+        memory_in=MemoryCreate(
+            user_id=user_id,
+            category="goal",
+            content="Wants to pass IELTS with band 7.5",
+            embedding=emb2,
+        ),
+    )
+    await db_session.commit()
+    assert mem1 is not None
+    assert mem2 is not None
+
+    # 3. Retrieve memories via GET endpoint
+    list_res2 = await client.get("/api/v1/memories")
+    assert list_res2.status_code == 200
+    memories = list_res2.json()
+    assert len(memories) == 2
+
+    # 4. Filter by category
+    goal_res = await client.get("/api/v1/memories?category=goal")
+    assert goal_res.status_code == 200
+    goals = goal_res.json()
+    assert len(goals) == 1
+    assert goals[0]["content"] == "Wants to pass IELTS with band 7.5"
+    assert goals[0]["category"] == "goal"
+
+    # 5. Delete a memory
+    del_res = await client.delete(f"/api/v1/memories/{mem1.id}")
+    assert del_res.status_code == 204
+
+    # 6. Verify only 1 memory left
+    list_res3 = await client.get("/api/v1/memories")
+    assert list_res3.status_code == 200
+    remaining = list_res3.json()
+    assert len(remaining) == 1
+    assert remaining[0]["id"] == str(mem2.id)
+
+    # 7. Deleting already deleted / nonexistent memory returns 404
+    del_res_404 = await client.delete(f"/api/v1/memories/{mem1.id}")
+    assert del_res_404.status_code == 404
+

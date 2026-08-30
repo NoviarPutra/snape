@@ -28,7 +28,7 @@ async def test_gemini_llm_service_streaming() -> None:
     mock_client.aio = mock_aio
     mock_aio.models = mock_models
 
-    async def fake_stream(*args, **kwargs) -> AsyncGenerator[MagicMock, None]:
+    async def fake_stream(*args: object, **kwargs: object) -> AsyncGenerator[MagicMock, None]:
         chunks = [
             MagicMock(text="That's "),
             MagicMock(text="great "),

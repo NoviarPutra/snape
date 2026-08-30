@@ -1,3 +1,4 @@
+from collections.abc import AsyncGenerator
 from uuid import uuid4
 
 import pytest
@@ -15,7 +16,7 @@ def ws_app(db_session: AsyncSession) -> TestClient:
     app = create_app()
 
     # Override get_db to use db_session
-    async def override_get_db():
+    async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
         yield db_session
 
     app.dependency_overrides[get_db] = override_get_db

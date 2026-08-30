@@ -1,3 +1,4 @@
+import logging
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 from uuid import UUID
@@ -13,6 +14,9 @@ from app.core.prompt_builder import (
 from app.schemas.message import MessageCreate
 from app.services import session_service, user_service
 from app.services.llm_service import BaseLLMService, get_llm_service
+from app.services.memory_service import MemoryService, get_memory_service
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -33,10 +37,15 @@ StreamEvent = StreamTokenEvent | StreamDoneEvent
 
 
 class ChatPipeline:
-    """Orchestrates turn-level LLM streaming, prompt generation, and message persistence."""
+    """Orchestrates turn-level LLM streaming, vector recall, memory extraction, and persistence."""
 
-    def __init__(self, llm_service: BaseLLMService | None = None) -> None:
+    def __init__(
+        self,
+        llm_service: BaseLLMService | None = None,
+        memory_service: MemoryService | None = None,
+    ) -> None:
         self.llm_service = llm_service or get_llm_service()
+        self.memory_service = memory_service or get_memory_service()
 
     async def stream_turn(
         self,
@@ -59,7 +68,24 @@ class ChatPipeline:
             db, session_id, limit=DEFAULT_BUFFER_SIZE
         )
 
-        # 4. Persist user message
+        # 4. Recall relevant memories if not explicitly provided
+        recalled_memories: list[str] = []
+        if memories is not None:
+            recalled_memories = memories
+        else:
+            try:
+                search_results = await self.memory_service.search_memories(
+                    db=db,
+                    user_id=user.id,
+                    query=user_content,
+                    threshold=0.55,
+                    limit=5,
+                )
+                recalled_memories = [res.content for res in search_results]
+            except Exception as exc:
+                logger.warning("Failed to recall memories for user %s: %s", user.id, exc)
+
+        # 5. Persist user message
         user_message = await session_service.add_message(
             db,
             session_id=session_id,
@@ -67,15 +93,15 @@ class ChatPipeline:
         )
         await db.commit()
 
-        # 5. Build dynamic system prompt and structured contents
-        system_instruction = build_system_prompt(user=user, memories=memories)
+        # 6. Build dynamic system prompt and structured contents
+        system_instruction = build_system_prompt(user=user, memories=recalled_memories)
         contents = build_conversation_contents(
             history=recent_history,
             current_user_message=user_content,
             buffer_size=DEFAULT_BUFFER_SIZE,
         )
 
-        # 6. Stream tokens from LLM
+        # 7. Stream tokens from LLM
         accumulated_tokens: list[str] = []
         async for token in self.llm_service.stream_chat(
             system_instruction=system_instruction,
@@ -84,7 +110,7 @@ class ChatPipeline:
             accumulated_tokens.append(token)
             yield StreamTokenEvent(content=token)
 
-        # 7. Persist assistant response
+        # 8. Persist assistant response
         full_text = "".join(accumulated_tokens)
         assistant_message = await session_service.add_message(
             db,
@@ -97,11 +123,23 @@ class ChatPipeline:
         )
         await db.commit()
 
-        # 8. Yield completion event
+        # 9. Extract and persist newly revealed memories
+        extracted_memories: list[str] = []
+        try:
+            extracted_memories = await self.memory_service.extract_and_persist(
+                db=db,
+                user_id=user.id,
+                user_content=user_content,
+                recent_history=recent_history,
+            )
+        except Exception as exc:
+            logger.warning("Error during memory extraction in chat pipeline: %s", exc)
+
+        # 10. Yield completion event
         yield StreamDoneEvent(
             session_id=session_id,
             user_message_id=user_message.id,
             assistant_message_id=assistant_message.id,
             full_text=full_text,
-            extracted_memories=[],
+            extracted_memories=extracted_memories,
         )
