@@ -194,9 +194,12 @@ class PocketTTSProvider(BaseTTSProvider):
 @lru_cache
 def get_tts_provider(provider_type: str | None = None) -> BaseTTSProvider:
     """Factory creating configured TTS provider instance."""
+    if provider_type is None and not settings.ENABLE_TTS:
+        return MockTTSProvider()
+
     provider_name = (provider_type or settings.TTS_PROVIDER).lower()
 
-    if not settings.ENABLE_TTS or provider_name in ("mock", "mock_tts", "none"):
+    if provider_name in ("mock", "mock_tts", "none"):
         return MockTTSProvider()
 
     if provider_name in ("edge_tts", "edgetts", "edge"):

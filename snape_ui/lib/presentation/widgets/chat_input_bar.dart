@@ -10,6 +10,7 @@ class ChatInputBar extends StatefulWidget {
   final bool isStreaming;
   final VoidCallback? onMicTap;
   final bool isRecording;
+  final bool showMicButton;
   final TextEditingController? controller;
 
   const ChatInputBar({
@@ -18,6 +19,7 @@ class ChatInputBar extends StatefulWidget {
     this.isStreaming = false,
     this.onMicTap,
     this.isRecording = false,
+    this.showMicButton = false,
     this.controller,
   });
 
@@ -80,12 +82,12 @@ class _ChatInputBarState extends State<ChatInputBar> {
 
     return Container(
       padding: EdgeInsets.only(
-        left: AppSpacing.sm.w,
-        right: AppSpacing.sm.w,
-        top: AppSpacing.xs.h,
+        left: AppSpacing.base.w,
+        right: AppSpacing.base.w,
+        top: AppSpacing.sm.h,
         bottom: MediaQuery.of(context).padding.bottom > 0
             ? MediaQuery.of(context).padding.bottom + 4.h
-            : AppSpacing.sm.h,
+            : AppSpacing.md.h,
       ),
       decoration: const BoxDecoration(
         color: AppColors.parchmentBackground,
@@ -99,37 +101,39 @@ class _ChatInputBarState extends State<ChatInputBar> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          // Voice Input Mic Button
-          Container(
-            width: buttonSize,
-            height: buttonSize,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: widget.isRecording
-                  ? AppColors.micRecording.withValues(alpha: 0.15)
-                  : AppColors.surfaceCard,
-              border: Border.all(
+          // Optional Voice Input Mic Button (Hidden by default)
+          if (widget.showMicButton) ...[
+            Container(
+              width: buttonSize,
+              height: buttonSize,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
                 color: widget.isRecording
-                    ? AppColors.micRecording
-                    : AppColors.dividerColor,
-                width: 1,
+                    ? AppColors.micRecording.withValues(alpha: 0.15)
+                    : AppColors.surfaceCard,
+                border: Border.all(
+                  color: widget.isRecording
+                      ? AppColors.micRecording
+                      : AppColors.dividerColor,
+                  width: 1,
+                ),
+              ),
+              child: IconButton(
+                onPressed: widget.onMicTap,
+                padding: EdgeInsets.zero,
+                icon: Icon(
+                  widget.isRecording ? Icons.mic : Icons.mic_none_rounded,
+                  color: widget.isRecording
+                      ? AppColors.micRecording
+                      : AppColors.slateMuted,
+                  size: 20.r,
+                ),
+                tooltip: widget.isRecording ? 'Stop Recording' : 'Voice Input',
               ),
             ),
-            child: IconButton(
-              onPressed: widget.onMicTap,
-              padding: EdgeInsets.zero,
-              icon: Icon(
-                widget.isRecording ? Icons.mic : Icons.mic_none_rounded,
-                color: widget.isRecording
-                    ? AppColors.micRecording
-                    : AppColors.slateMuted,
-                size: 20.r,
-              ),
-              tooltip: widget.isRecording ? 'Stop Recording' : 'Voice Input',
-            ),
-          ),
-          SizedBox(width: AppSpacing.xs.w),
-          // Text Input Field (Expands vertically dynamically with unlimited lines)
+            SizedBox(width: AppSpacing.xs.w),
+          ],
+          // Text Input Field (Full width, expands dynamically with multiline text)
           Expanded(
             child: Container(
               constraints: BoxConstraints(
@@ -143,7 +147,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
                   width: 1,
                 ),
               ),
-              padding: EdgeInsets.symmetric(horizontal: 14.w),
+              padding: EdgeInsets.symmetric(horizontal: 16.w),
               alignment: Alignment.centerLeft,
               child: TextField(
                 controller: _effectiveController,

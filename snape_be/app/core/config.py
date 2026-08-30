@@ -48,7 +48,7 @@ class Settings(BaseSettings):
     EMBEDDING_DIMENSION: int = 768
 
     # TTS Settings
-    ENABLE_TTS: bool = True
+    ENABLE_TTS: bool = False
     TTS_PROVIDER: str = "edge_tts"
     EDGE_TTS_VOICE: str = "en-US-ChristopherNeural"
     POCKET_TTS_VOICE: str = "af_sky"
