@@ -76,13 +76,15 @@ class _ChatInputBarState extends State<ChatInputBar> {
 
   @override
   Widget build(BuildContext context) {
+    final buttonSize = 40.r;
+
     return Container(
       padding: EdgeInsets.only(
         left: AppSpacing.sm.w,
         right: AppSpacing.sm.w,
         top: AppSpacing.xs.h,
         bottom: MediaQuery.of(context).padding.bottom > 0
-            ? MediaQuery.of(context).padding.bottom + 2.h
+            ? MediaQuery.of(context).padding.bottom + 4.h
             : AppSpacing.sm.h,
       ),
       decoration: const BoxDecoration(
@@ -97,26 +99,43 @@ class _ChatInputBarState extends State<ChatInputBar> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          // Audio Recording / Mic Button
-          Padding(
-            padding: EdgeInsets.only(bottom: 2.h),
+          // Voice Input Mic Button
+          Container(
+            width: buttonSize,
+            height: buttonSize,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: widget.isRecording
+                  ? AppColors.micRecording.withValues(alpha: 0.15)
+                  : AppColors.surfaceCard,
+              border: Border.all(
+                color: widget.isRecording
+                    ? AppColors.micRecording
+                    : AppColors.dividerColor,
+                width: 1,
+              ),
+            ),
             child: IconButton(
               onPressed: widget.onMicTap,
+              padding: EdgeInsets.zero,
               icon: Icon(
                 widget.isRecording ? Icons.mic : Icons.mic_none_rounded,
                 color: widget.isRecording
                     ? AppColors.micRecording
-                    : AppColors.micIdle,
-                size: 22.r,
+                    : AppColors.slateMuted,
+                size: 20.r,
               ),
-              splashRadius: 20.r,
               tooltip: widget.isRecording ? 'Stop Recording' : 'Voice Input',
             ),
           ),
-          SizedBox(width: AppSpacing.xxs.w),
-          // Text Input Field
+          SizedBox(width: AppSpacing.xs.w),
+          // Text Input Field (Expands vertically with multiline input)
           Expanded(
             child: Container(
+              constraints: BoxConstraints(
+                minHeight: buttonSize,
+                maxHeight: 120.h,
+              ),
               decoration: BoxDecoration(
                 color: AppColors.surfaceCard,
                 borderRadius: BorderRadius.circular(AppRadii.xl.r),
@@ -125,6 +144,8 @@ class _ChatInputBarState extends State<ChatInputBar> {
                   width: 1,
                 ),
               ),
+              padding: EdgeInsets.symmetric(horizontal: 14.w),
+              alignment: Alignment.centerLeft,
               child: TextField(
                 controller: _effectiveController,
                 minLines: 1,
@@ -141,36 +162,39 @@ class _ChatInputBarState extends State<ChatInputBar> {
                   ),
                   isDense: true,
                   border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 8.h),
+                  contentPadding: EdgeInsets.symmetric(vertical: 10.h),
                 ),
               ),
             ),
           ),
           SizedBox(width: AppSpacing.xs.w),
           // Send Action Button
-          Padding(
-            padding: EdgeInsets.only(bottom: 2.h),
-            child: Container(
-              width: 36.r,
-              height: 36.r,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
+          Container(
+            width: buttonSize,
+            height: buttonSize,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: (_hasText && !widget.isStreaming)
+                  ? AppColors.indigoAccent
+                  : AppColors.surfaceCard,
+              border: Border.all(
                 color: (_hasText && !widget.isStreaming)
                     ? AppColors.indigoAccent
-                    : AppColors.surfaceWarm,
+                    : AppColors.dividerColor,
+                width: 1,
               ),
-              child: IconButton(
-                onPressed: (_hasText && !widget.isStreaming) ? _handleSubmit : null,
-                icon: Icon(
-                  Icons.arrow_upward_rounded,
-                  color: (_hasText && !widget.isStreaming)
-                      ? Colors.white
-                      : AppColors.slateMuted,
-                  size: 18.r,
-                ),
-                padding: EdgeInsets.zero,
-                tooltip: 'Send Message',
+            ),
+            child: IconButton(
+              onPressed: (_hasText && !widget.isStreaming) ? _handleSubmit : null,
+              padding: EdgeInsets.zero,
+              icon: Icon(
+                Icons.arrow_upward_rounded,
+                color: (_hasText && !widget.isStreaming)
+                    ? Colors.white
+                    : AppColors.slateMuted.withValues(alpha: 0.5),
+                size: 20.r,
               ),
+              tooltip: 'Send Message',
             ),
           ),
         ],
