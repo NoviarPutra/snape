@@ -18,6 +18,7 @@ class ChatState {
   final String? errorMessage;
   final String currentStreamingId;
   final List<String> lastExtractedMemories;
+  final bool isSpeaking;
 
   const ChatState({
     this.sessionId,
@@ -28,6 +29,7 @@ class ChatState {
     this.errorMessage,
     this.currentStreamingId = '',
     this.lastExtractedMemories = const [],
+    this.isSpeaking = false,
   });
 
   bool get isConnected => connectionStatus == ConnectionStatus.connected;
@@ -44,6 +46,7 @@ class ChatState {
     String? errorMessage,
     String? currentStreamingId,
     List<String>? lastExtractedMemories,
+    bool? isSpeaking,
     bool clearError = false,
     bool clearStreamingId = false,
   }) {
@@ -54,8 +57,12 @@ class ChatState {
       isStreaming: isStreaming ?? this.isStreaming,
       connectionStatus: connectionStatus ?? this.connectionStatus,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
-      currentStreamingId: clearStreamingId ? '' : (currentStreamingId ?? this.currentStreamingId),
-      lastExtractedMemories: lastExtractedMemories ?? this.lastExtractedMemories,
+      currentStreamingId: clearStreamingId
+          ? ''
+          : (currentStreamingId ?? this.currentStreamingId),
+      lastExtractedMemories:
+          lastExtractedMemories ?? this.lastExtractedMemories,
+      isSpeaking: isSpeaking ?? this.isSpeaking,
     );
   }
 

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
+import '../../core/services/audio_queue_service.dart';
 import '../../data/models/websocket_events.dart';
 import '../../domain/models/chat_message.dart';
 import '../../domain/repositories/chat_repository.dart';
@@ -9,14 +10,17 @@ import 'providers.dart';
 
 class ChatNotifier extends StateNotifier<ChatState> {
   final ChatRepository _repository;
+  final AudioQueueService? _audioQueueService;
   StreamSubscription<WSOutputEvent>? _eventSubscription;
   StreamSubscription<bool>? _connectionSubscription;
+  StreamSubscription<bool>? _speakingSubscription;
   Timer? _reconnectTimer;
   int _reconnectAttempts = 0;
   static const int _maxReconnectAttempts = 5;
   static const _uuid = Uuid();
 
-  ChatNotifier(this._repository) : super(const ChatState()) {
+  ChatNotifier(this._repository, [this._audioQueueService])
+      : super(const ChatState()) {
     _listenToStreams();
   }
 
@@ -53,6 +57,13 @@ class ChatNotifier extends StateNotifier<ChatState> {
         }
       },
     );
+
+    if (_audioQueueService != null) {
+      _speakingSubscription =
+          _audioQueueService.isSpeakingStream.listen((speaking) {
+        state = state.copyWith(isSpeaking: speaking);
+      });
+    }
   }
 
   Future<void> switchSession(String sessionId) async {
@@ -60,6 +71,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
       return;
     }
 
+    _audioQueueService?.stopAndClear();
     _reconnectTimer?.cancel();
     _reconnectAttempts = 0;
 
@@ -128,6 +140,9 @@ class ChatNotifier extends StateNotifier<ChatState> {
     final trimmed = text.trim();
     if (trimmed.isEmpty || state.sessionId == null) return;
 
+    // Barge-in: halt ongoing companion audio playback and clear queued audio buffers
+    _audioQueueService?.stopAndClear();
+
     final userMessageId = _uuid.v4();
     final userMessage = ChatMessage(
       id: userMessageId,
@@ -189,8 +204,8 @@ class ChatNotifier extends StateNotifier<ChatState> {
     switch (event) {
       case WSTokenEvent(:final content):
         _onTokenReceived(content);
-      case WSAudioEvent():
-        break;
+      case WSAudioEvent(:final audioBase64, :final sentence):
+        _audioQueueService?.enqueueBase64(audioBase64, sentence: sentence);
       case WSDoneEvent(
           :final fullText,
           :final userMessageId,
@@ -248,6 +263,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
           content: fullText.isNotEmpty ? fullText : msg.content,
           isStreaming: false,
           status: MessageStatus.delivered,
+          extractedMemories: extractedMemories,
         );
       }
       return msg;
@@ -263,6 +279,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
 
   @override
   void dispose() {
+    _speakingSubscription?.cancel();
     _reconnectTimer?.cancel();
     _eventSubscription?.cancel();
     _connectionSubscription?.cancel();
@@ -272,5 +289,6 @@ class ChatNotifier extends StateNotifier<ChatState> {
 
 final chatProvider = StateNotifierProvider<ChatNotifier, ChatState>((ref) {
   final repository = ref.watch(chatRepositoryProvider);
-  return ChatNotifier(repository);
+  final audioQueue = ref.watch(audioQueueServiceProvider);
+  return ChatNotifier(repository, audioQueue);
 });

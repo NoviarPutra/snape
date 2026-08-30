@@ -9,6 +9,7 @@ import '../state/session_notifier.dart';
 import '../widgets/chat_empty_view.dart';
 import '../widgets/chat_input_bar.dart';
 import '../widgets/connection_status_banner.dart';
+import '../widgets/memory_drawer.dart';
 import '../widgets/message_bubble.dart';
 import '../widgets/session_drawer.dart';
 
@@ -101,6 +102,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           ref.read(sessionProvider.notifier).deleteSession(sessionId);
         },
       ),
+      endDrawer: const MemoryDrawer(),
       appBar: AppBar(
         leading: IconButton(
           icon: Icon(Icons.menu_rounded, size: 24.r),
@@ -120,18 +122,22 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   height: 6.r,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: chatState.isConnected
-                        ? AppColors.statusOnline
-                        : (chatState.isReconnecting
-                            ? AppColors.statusReconnecting
-                            : AppColors.statusError),
+                    color: chatState.isSpeaking
+                        ? AppColors.indigoAccent
+                        : (chatState.isConnected
+                            ? AppColors.statusOnline
+                            : (chatState.isReconnecting
+                                ? AppColors.statusReconnecting
+                                : AppColors.statusError)),
                   ),
                 ),
                 SizedBox(width: AppSpacing.xs.w),
                 Text(
-                  chatState.isConnected
-                      ? 'Live Companion'
-                      : (chatState.isReconnecting ? 'Reconnecting...' : 'Offline'),
+                  chatState.isSpeaking
+                      ? 'Speaking...'
+                      : (chatState.isConnected
+                          ? 'Live Companion'
+                          : (chatState.isReconnecting ? 'Reconnecting...' : 'Offline')),
                   style: AppTypography.caption,
                 ),
               ],
@@ -139,6 +145,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           ],
         ),
         actions: [
+          IconButton(
+            icon: Icon(Icons.psychology_outlined, size: 22.r, color: AppColors.indigoAccent),
+            tooltip: 'Memory Drawer',
+            onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
+          ),
           IconButton(
             icon: Icon(Icons.add_comment_outlined, size: 22.r, color: AppColors.indigoAccent),
             tooltip: 'New Practice Session',

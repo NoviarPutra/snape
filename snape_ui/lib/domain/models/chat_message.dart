@@ -45,6 +45,7 @@ class ChatMessage {
   final String content;
   final String? audioPath;
   final Map<String, dynamic>? metaInfo;
+  final List<String> extractedMemories;
   final DateTime createdAt;
   final bool isStreaming;
   final MessageStatus status;
@@ -56,6 +57,7 @@ class ChatMessage {
     required this.content,
     this.audioPath,
     this.metaInfo,
+    this.extractedMemories = const [],
     required this.createdAt,
     this.isStreaming = false,
     this.status = MessageStatus.delivered,
@@ -65,6 +67,18 @@ class ChatMessage {
   bool get isAssistant => role == MessageRole.assistant;
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) {
+    List<String> memories = const [];
+    if (json['extracted_memories'] is List) {
+      memories = (json['extracted_memories'] as List<dynamic>)
+          .map((e) => e.toString())
+          .toList();
+    } else if (json['meta_info'] is Map &&
+        json['meta_info']['extracted_memories'] is List) {
+      memories = (json['meta_info']['extracted_memories'] as List<dynamic>)
+          .map((e) => e.toString())
+          .toList();
+    }
+
     return ChatMessage(
       id: json['id'] as String,
       sessionId: (json['session_id'] as String?) ?? '',
@@ -72,6 +86,7 @@ class ChatMessage {
       content: (json['content'] as String?) ?? '',
       audioPath: json['audio_path'] as String?,
       metaInfo: json['meta_info'] as Map<String, dynamic>?,
+      extractedMemories: memories,
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'] as String)
           : DateTime.now(),
@@ -88,6 +103,7 @@ class ChatMessage {
       'content': content,
       'audio_path': audioPath,
       'meta_info': metaInfo,
+      'extracted_memories': extractedMemories,
       'created_at': createdAt.toIso8601String(),
     };
   }
@@ -99,6 +115,7 @@ class ChatMessage {
     String? content,
     String? audioPath,
     Map<String, dynamic>? metaInfo,
+    List<String>? extractedMemories,
     DateTime? createdAt,
     bool? isStreaming,
     MessageStatus? status,
@@ -110,6 +127,7 @@ class ChatMessage {
       content: content ?? this.content,
       audioPath: audioPath ?? this.audioPath,
       metaInfo: metaInfo ?? this.metaInfo,
+      extractedMemories: extractedMemories ?? this.extractedMemories,
       createdAt: createdAt ?? this.createdAt,
       isStreaming: isStreaming ?? this.isStreaming,
       status: status ?? this.status,

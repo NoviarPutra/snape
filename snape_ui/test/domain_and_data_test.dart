@@ -1,9 +1,29 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:snape_ui/data/models/websocket_events.dart';
 import 'package:snape_ui/domain/models/chat_message.dart';
+import 'package:snape_ui/domain/models/memory_item.dart';
 import 'package:snape_ui/domain/models/session.dart';
 
 void main() {
+  group('MemoryItem', () {
+    test('fromJson and toJson should preserve properties', () {
+      final now = DateTime.now();
+      final json = {
+        'id': 'mem-123',
+        'user_id': 'user-456',
+        'category': 'fact',
+        'content': 'User loves hiking in mountains.',
+        'created_at': now.toIso8601String(),
+      };
+
+      final memory = MemoryItem.fromJson(json);
+      expect(memory.id, 'mem-123');
+      expect(memory.userId, 'user-456');
+      expect(memory.category, 'fact');
+      expect(memory.content, 'User loves hiking in mountains.');
+      expect(memory.toJson()['category'], 'fact');
+    });
+  });
   group('SessionModel', () {
     test('fromJson and toJson should preserve properties', () {
       final now = DateTime.now();

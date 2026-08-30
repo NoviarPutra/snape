@@ -1,5 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:snape_ui/core/services/audio_queue_service.dart';
 import 'package:snape_ui/data/models/websocket_events.dart';
 import 'package:snape_ui/domain/models/chat_message.dart';
 import 'package:snape_ui/domain/models/session.dart';
@@ -86,24 +89,60 @@ class FakeChatRepository implements ChatRepository {
   }
 }
 
+class FakeAudioPlayerAdapter implements AudioPlayerAdapter {
+  final StreamController<void> _completeController =
+      StreamController<void>.broadcast();
+  final List<Uint8List> playedChunks = [];
+  bool isStopped = false;
+
+  @override
+  Stream<void> get onPlayerComplete => _completeController.stream;
+
+  @override
+  Future<void> playBytes(Uint8List bytes, {String mimeType = 'audio/wav'}) async {
+    isStopped = false;
+    playedChunks.add(bytes);
+  }
+
+  @override
+  Future<void> stop() async {
+    isStopped = true;
+  }
+
+  @override
+  Future<void> dispose() async {
+    await _completeController.close();
+  }
+
+  void complete() {
+    _completeController.add(null);
+  }
+}
+
 void main() {
   group('ChatNotifier State Management', () {
     late FakeChatRepository repository;
+    late FakeAudioPlayerAdapter audioAdapter;
+    late AudioQueueService audioQueue;
     late ChatNotifier notifier;
 
     setUp(() {
       repository = FakeChatRepository();
-      notifier = ChatNotifier(repository);
+      audioAdapter = FakeAudioPlayerAdapter();
+      audioQueue = AudioQueueService(playerAdapter: audioAdapter);
+      notifier = ChatNotifier(repository, audioQueue);
     });
 
-    tearDown(() {
+    tearDown(() async {
       notifier.dispose();
       repository.dispose();
+      await audioQueue.dispose();
     });
 
     test('initial state is disconnected with empty messages', () {
       expect(notifier.state.messages, isEmpty);
       expect(notifier.state.connectionStatus, ConnectionStatus.disconnected);
+      expect(notifier.state.isSpeaking, isFalse);
     });
 
     test('switchSession loads history and connects to websocket stream', () async {
@@ -157,7 +196,44 @@ void main() {
       expect(notifier.state.isStreaming, isTrue);
     });
 
-    test('done event finalizes assistant message and sets isStreaming to false', () async {
+    test('audio event triggers queue playback and updates isSpeaking', () async {
+      await notifier.switchSession('sess-1');
+      final dummyAudio = base64Encode(Uint8List.fromList([1, 2, 3, 4]));
+
+      repository.emitEvent(WSAudioEvent(
+        sentence: 'Hello there',
+        audioBase64: dummyAudio,
+      ));
+      await Future<void>.delayed(Duration.zero);
+
+      expect(audioAdapter.playedChunks.length, 1);
+      expect(notifier.state.isSpeaking, isTrue);
+
+      audioAdapter.complete();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(notifier.state.isSpeaking, isFalse);
+    });
+
+    test('barge-in: sending new message stops playing audio', () async {
+      await notifier.switchSession('sess-1');
+      final dummyAudio = base64Encode(Uint8List.fromList([1, 2, 3, 4]));
+
+      repository.emitEvent(WSAudioEvent(
+        sentence: 'Hello there',
+        audioBase64: dummyAudio,
+      ));
+      await Future<void>.delayed(Duration.zero);
+      expect(notifier.state.isSpeaking, isTrue);
+
+      // Barge in with new message
+      await notifier.sendMessage('Interrupting with new question!');
+
+      expect(audioAdapter.isStopped, isTrue);
+      expect(notifier.state.isSpeaking, isFalse);
+    });
+
+    test('done event finalizes assistant message with extracted memories and sets isStreaming to false', () async {
       await notifier.switchSession('sess-1');
       await notifier.sendMessage('How are you?');
 
@@ -165,7 +241,7 @@ void main() {
       repository.emitEvent(const WSDoneEvent(
         sessionId: 'sess-1',
         fullText: 'I am great, thank you!',
-        extractedMemories: ['User is friendly'],
+        extractedMemories: ['User is friendly and studying IELTS'],
       ));
 
       await Future<void>.delayed(Duration.zero);
@@ -173,8 +249,9 @@ void main() {
       final assistantMsg = notifier.state.messages[1];
       expect(assistantMsg.content, 'I am great, thank you!');
       expect(assistantMsg.isStreaming, isFalse);
+      expect(assistantMsg.extractedMemories, ['User is friendly and studying IELTS']);
       expect(notifier.state.isStreaming, isFalse);
-      expect(notifier.state.lastExtractedMemories, ['User is friendly']);
+      expect(notifier.state.lastExtractedMemories, ['User is friendly and studying IELTS']);
     });
   });
 }

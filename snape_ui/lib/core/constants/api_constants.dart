@@ -8,6 +8,8 @@ class ApiConstants {
   static String sessionMessagesUrl(String sessionId) =>
       '$baseHttpUrl/sessions/$sessionId';
   static String sessionsUrl = '$baseHttpUrl/sessions';
+  static String memoriesUrl = '$baseHttpUrl/memories';
+  static String memoryDetailUrl(String memoryId) => '$baseHttpUrl/memories/$memoryId';
   static String chatWsUrl(String sessionId, {String? host}) {
     final effectiveHost = host ?? defaultHost;
     return 'ws://$effectiveHost/ws/chat/$sessionId';

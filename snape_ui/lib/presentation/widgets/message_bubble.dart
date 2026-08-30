@@ -95,6 +95,50 @@ class MessageBubble extends StatelessWidget {
                     : AppTypography.bodyLarge,
               ),
             ],
+            if (!isUser && message.extractedMemories.isNotEmpty) ...[
+              SizedBox(height: AppSpacing.xs.h),
+              Wrap(
+                spacing: AppSpacing.xxs.w,
+                runSpacing: AppSpacing.xxs.h,
+                children: message.extractedMemories.map((mem) {
+                  return Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: AppSpacing.xs.w,
+                      vertical: 2.h,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.indigoSoftBackground,
+                      borderRadius: BorderRadius.circular(AppRadii.xs.r),
+                      border: Border.all(
+                        color: AppColors.indigoAccentLight.withAlpha(80),
+                        width: 0.5,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.auto_awesome,
+                          size: 11.r,
+                          color: AppColors.indigoAccent,
+                        ),
+                        SizedBox(width: 3.w),
+                        Flexible(
+                          child: Text(
+                            'Remembered: $mem',
+                            style: AppTypography.caption.copyWith(
+                              color: AppColors.indigoAccent,
+                              fontSize: 10.sp,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
             SizedBox(height: AppSpacing.xs.h),
             Row(
               mainAxisSize: MainAxisSize.min,
