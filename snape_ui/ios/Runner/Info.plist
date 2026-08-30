@@ -66,6 +66,10 @@
       <string>UIInterfaceOrientationLandscapeLeft</string>
       <string>UIInterfaceOrientationLandscapeRight</string>
     </array>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Snape requires microphone access to practice spoken English and transcribe your speech.</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>Snape requires speech recognition to transcribe your English practice.</string>
     <key>NSAppTransportSecurity</key>
     <dict>
       <key>NSAllowsLocalNetworking</key>

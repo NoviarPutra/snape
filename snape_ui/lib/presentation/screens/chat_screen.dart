@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import '../../core/services/speech_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_typography.dart';
@@ -23,6 +24,8 @@ class ChatScreen extends ConsumerStatefulWidget {
 class _ChatScreenState extends ConsumerState<ChatScreen> {
   final ScrollController _scrollController = ScrollController();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  final TextEditingController _textController = TextEditingController();
+  final SpeechService _speechService = SpeechService();
   bool _isRecording = false;
 
   @override
@@ -63,8 +66,58 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     });
   }
 
+  Future<void> _toggleVoiceRecording() async {
+    if (_isRecording) {
+      await _speechService.stopListening();
+      if (mounted) {
+        setState(() {
+          _isRecording = false;
+        });
+      }
+    } else {
+      final available = await _speechService.initialize();
+      if (!available) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Speech recognition is not available on this device or permission was denied.'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+        return;
+      }
+      if (mounted) {
+        setState(() {
+          _isRecording = true;
+        });
+      }
+      await _speechService.startListening(
+        onResult: (text, isFinal) {
+          if (mounted && text.isNotEmpty) {
+            setState(() {
+              _textController.text = text;
+              _textController.selection = TextSelection.fromPosition(
+                TextPosition(offset: _textController.text.length),
+              );
+            });
+          }
+        },
+        onListeningStateChanged: (listening) {
+          if (mounted) {
+            setState(() {
+              _isRecording = listening;
+            });
+          }
+        },
+      );
+    }
+  }
+
   @override
   void dispose() {
+    _speechService.stopListening();
+    _textController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -196,13 +249,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       ),
           ),
           ChatInputBar(
+            controller: _textController,
             isStreaming: chatState.isStreaming,
             isRecording: _isRecording,
-            onMicTap: () {
-              setState(() {
-                _isRecording = !_isRecording;
-              });
-            },
+            onMicTap: _toggleVoiceRecording,
             onSendMessage: (text) {
               ref.read(chatProvider.notifier).sendMessage(text);
             },

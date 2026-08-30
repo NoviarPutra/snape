@@ -10,6 +10,7 @@ class ChatInputBar extends StatefulWidget {
   final bool isStreaming;
   final VoidCallback? onMicTap;
   final bool isRecording;
+  final TextEditingController? controller;
 
   const ChatInputBar({
     super.key,
@@ -17,6 +18,7 @@ class ChatInputBar extends StatefulWidget {
     this.isStreaming = false,
     this.onMicTap,
     this.isRecording = false,
+    this.controller,
   });
 
   @override
@@ -24,46 +26,64 @@ class ChatInputBar extends StatefulWidget {
 }
 
 class _ChatInputBarState extends State<ChatInputBar> {
-  late final TextEditingController _controller;
+  TextEditingController? _internalController;
+  TextEditingController get _effectiveController =>
+      widget.controller ?? (_internalController ??= TextEditingController());
+
   bool _hasText = false;
 
   @override
   void initState() {
     super.initState();
-    _controller = TextEditingController();
-    _controller.addListener(() {
-      final hasTextNow = _controller.text.trim().isNotEmpty;
-      if (hasTextNow != _hasText) {
+    _effectiveController.addListener(_handleTextChange);
+    _hasText = _effectiveController.text.trim().isNotEmpty;
+  }
+
+  @override
+  void didUpdateWidget(covariant ChatInputBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller?.removeListener(_handleTextChange);
+      _effectiveController.addListener(_handleTextChange);
+      _handleTextChange();
+    }
+  }
+
+  void _handleTextChange() {
+    final hasTextNow = _effectiveController.text.trim().isNotEmpty;
+    if (hasTextNow != _hasText) {
+      if (mounted) {
         setState(() {
           _hasText = hasTextNow;
         });
       }
-    });
+    }
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    widget.controller?.removeListener(_handleTextChange);
+    _internalController?.dispose();
     super.dispose();
   }
 
   void _handleSubmit() {
-    final text = _controller.text.trim();
+    final text = _effectiveController.text.trim();
     if (text.isEmpty || widget.isStreaming) return;
     widget.onSendMessage(text);
-    _controller.clear();
+    _effectiveController.clear();
   }
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: EdgeInsets.only(
-        left: AppSpacing.base.w,
-        right: AppSpacing.base.w,
-        top: AppSpacing.sm.h,
+        left: AppSpacing.sm.w,
+        right: AppSpacing.sm.w,
+        top: AppSpacing.xs.h,
         bottom: MediaQuery.of(context).padding.bottom > 0
-            ? MediaQuery.of(context).padding.bottom
-            : AppSpacing.md.h,
+            ? MediaQuery.of(context).padding.bottom + 2.h
+            : AppSpacing.sm.h,
       ),
       decoration: const BoxDecoration(
         color: AppColors.parchmentBackground,
@@ -77,27 +97,26 @@ class _ChatInputBarState extends State<ChatInputBar> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          // Audio Recording Hook Toggle Button
-          IconButton(
-            onPressed: widget.onMicTap ?? () {},
-            icon: Icon(
-              widget.isRecording ? Icons.mic : Icons.mic_none_rounded,
-              color: widget.isRecording
-                  ? AppColors.micRecording
-                  : AppColors.micIdle,
-              size: 22.r,
+          // Audio Recording / Mic Button
+          Padding(
+            padding: EdgeInsets.only(bottom: 2.h),
+            child: IconButton(
+              onPressed: widget.onMicTap,
+              icon: Icon(
+                widget.isRecording ? Icons.mic : Icons.mic_none_rounded,
+                color: widget.isRecording
+                    ? AppColors.micRecording
+                    : AppColors.micIdle,
+                size: 22.r,
+              ),
+              splashRadius: 20.r,
+              tooltip: widget.isRecording ? 'Stop Recording' : 'Voice Input',
             ),
-            splashRadius: 20.r,
-            tooltip: widget.isRecording ? 'Stop Recording' : 'Voice Input (Hook)',
           ),
-          SizedBox(width: AppSpacing.xs.w),
+          SizedBox(width: AppSpacing.xxs.w),
           // Text Input Field
           Expanded(
             child: Container(
-              constraints: BoxConstraints(
-                minHeight: 40.h,
-                maxHeight: 120.h,
-              ),
               decoration: BoxDecoration(
                 color: AppColors.surfaceCard,
                 borderRadius: BorderRadius.circular(AppRadii.xl.r),
@@ -106,50 +125,52 @@ class _ChatInputBarState extends State<ChatInputBar> {
                   width: 1,
                 ),
               ),
-              padding: EdgeInsets.symmetric(horizontal: AppSpacing.base.w),
-              child: Center(
-                child: TextField(
-                  controller: _controller,
-                  minLines: 1,
-                  maxLines: 4,
-                  textInputAction: TextInputAction.send,
-                  onSubmitted: (_) => _handleSubmit(),
-                  style: AppTypography.input,
-                  decoration: InputDecoration(
-                    hintText: 'Speak or type in English (or campur)...',
-                    hintStyle: AppTypography.bodyMedium.copyWith(
-                      color: AppColors.slateMuted,
-                      fontSize: 14.sp,
-                    ),
-                    isDense: true,
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(vertical: 10.h),
+              child: TextField(
+                controller: _effectiveController,
+                minLines: 1,
+                maxLines: 4,
+                textInputAction: TextInputAction.send,
+                onSubmitted: (_) => _handleSubmit(),
+                style: AppTypography.input,
+                textAlignVertical: TextAlignVertical.center,
+                decoration: InputDecoration(
+                  hintText: 'Speak or type in English (or campur)...',
+                  hintStyle: AppTypography.bodyMedium.copyWith(
+                    color: AppColors.slateMuted,
+                    fontSize: 14.sp,
                   ),
+                  isDense: true,
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 8.h),
                 ),
               ),
             ),
           ),
-          SizedBox(width: AppSpacing.sm.w),
+          SizedBox(width: AppSpacing.xs.w),
           // Send Action Button
-          Container(
-            width: 40.r,
-            height: 40.r,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: (_hasText && !widget.isStreaming)
-                  ? AppColors.indigoAccent
-                  : AppColors.surfaceWarm,
-            ),
-            child: IconButton(
-              icon: Icon(
-                Icons.arrow_upward_rounded,
+          Padding(
+            padding: EdgeInsets.only(bottom: 2.h),
+            child: Container(
+              width: 36.r,
+              height: 36.r,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
                 color: (_hasText && !widget.isStreaming)
-                    ? Colors.white
-                    : AppColors.slateMuted,
-                size: 20.r,
+                    ? AppColors.indigoAccent
+                    : AppColors.surfaceWarm,
               ),
-              onPressed: (_hasText && !widget.isStreaming) ? _handleSubmit : null,
-              padding: EdgeInsets.zero,
+              child: IconButton(
+                onPressed: (_hasText && !widget.isStreaming) ? _handleSubmit : null,
+                icon: Icon(
+                  Icons.arrow_upward_rounded,
+                  color: (_hasText && !widget.isStreaming)
+                      ? Colors.white
+                      : AppColors.slateMuted,
+                  size: 18.r,
+                ),
+                padding: EdgeInsets.zero,
+                tooltip: 'Send Message',
+              ),
             ),
           ),
         ],
