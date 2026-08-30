@@ -3,7 +3,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 class AppConfig {
   AppConfig._();
 
-  static const String _defaultHost = 'uncontinual-julieann-corymbosely.ngrok-free.dev';
+  static const String _defaultHost = 'api.103-174-114-224.nip.io';
   static const String _defaultHttpScheme = 'https';
   static const String _defaultWsScheme = 'wss';
 
@@ -48,6 +48,5 @@ class AppConfig {
 
   static const Map<String, String> defaultHeaders = {
     'Content-Type': 'application/json',
-    'ngrok-skip-browser-warning': 'true',
   };
 }
