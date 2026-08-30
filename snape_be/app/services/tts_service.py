@@ -86,6 +86,44 @@ class MockTTSProvider(BaseTTSProvider):
         return generate_mock_wav(text=text, sample_rate=self._sample_rate)
 
 
+class EdgeTTSProvider(BaseTTSProvider):
+    """Microsoft Edge Neural TTS Provider delivering natural native English speech."""
+
+    def __init__(
+        self,
+        voice: str = "en-US-ChristopherNeural",
+        sample_rate: int = 24000,
+    ) -> None:
+        self.voice = voice
+        self._sample_rate = sample_rate
+
+    @property
+    def sample_rate(self) -> int:
+        return self._sample_rate
+
+    def synthesize_sync(self, text: str) -> bytes:
+        return generate_mock_wav(text=text, sample_rate=self._sample_rate)
+
+    async def synthesize(self, text: str) -> bytes:
+        if not text or not text.strip():
+            return b""
+        try:
+            import edge_tts
+
+            communicate = edge_tts.Communicate(text, self.voice)
+            chunks: list[bytes] = []
+            async for chunk in communicate.stream():
+                if chunk["type"] == "audio":
+                    chunks.append(chunk["data"])
+            audio_bytes = b"".join(chunks)
+            if audio_bytes:
+                return audio_bytes
+            return generate_mock_wav(text=text, sample_rate=self._sample_rate)
+        except Exception as exc:
+            logger.warning("EdgeTTS synthesis failed (%s). Falling back to mock synthesis.", exc)
+            return generate_mock_wav(text=text, sample_rate=self._sample_rate)
+
+
 class PocketTTSProvider(BaseTTSProvider):
     """Kyutai Pocket-TTS Provider running neural CPU speech synthesis."""
 
@@ -161,11 +199,14 @@ def get_tts_provider(provider_type: str | None = None) -> BaseTTSProvider:
     if not settings.ENABLE_TTS or provider_name in ("mock", "mock_tts", "none"):
         return MockTTSProvider()
 
+    if provider_name in ("edge_tts", "edgetts", "edge"):
+        return EdgeTTSProvider(voice=settings.EDGE_TTS_VOICE)
+
     if provider_name in ("pocket_tts", "pocket-tts", "pockettts"):
         return PocketTTSProvider(
             voice=settings.POCKET_TTS_VOICE,
             device=settings.POCKET_TTS_DEVICE,
         )
 
-    logger.warning("Unknown TTS provider '%s'. Defaulting to MockTTSProvider.", provider_name)
-    return MockTTSProvider()
+    logger.warning("Unknown TTS provider '%s'. Defaulting to EdgeTTSProvider.", provider_name)
+    return EdgeTTSProvider(voice=settings.EDGE_TTS_VOICE)

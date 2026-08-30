@@ -6,7 +6,7 @@ import 'package:flutter/foundation.dart';
 
 abstract class AudioPlayerAdapter {
   Stream<void> get onPlayerComplete;
-  Future<void> playBytes(Uint8List bytes, {String mimeType = 'audio/wav'});
+  Future<void> playBytes(Uint8List bytes, {String? mimeType});
   Future<void> stop();
   Future<void> dispose();
 }
@@ -20,9 +20,21 @@ class DefaultAudioPlayerAdapter implements AudioPlayerAdapter {
   @override
   Stream<void> get onPlayerComplete => _player.onPlayerComplete;
 
+  String _detectMimeType(Uint8List bytes) {
+    if (bytes.length >= 4 &&
+        bytes[0] == 0x52 &&
+        bytes[1] == 0x49 &&
+        bytes[2] == 0x46 &&
+        bytes[3] == 0x46) {
+      return 'audio/wav';
+    }
+    return 'audio/mpeg';
+  }
+
   @override
-  Future<void> playBytes(Uint8List bytes, {String mimeType = 'audio/wav'}) {
-    return _player.play(BytesSource(bytes, mimeType: mimeType));
+  Future<void> playBytes(Uint8List bytes, {String? mimeType}) {
+    final effectiveMime = mimeType ?? _detectMimeType(bytes);
+    return _player.play(BytesSource(bytes, mimeType: effectiveMime));
   }
 
   @override

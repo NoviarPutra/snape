@@ -15,7 +15,7 @@ class MockAudioPlayerAdapter implements AudioPlayerAdapter {
   Stream<void> get onPlayerComplete => _completeController.stream;
 
   @override
-  Future<void> playBytes(Uint8List bytes, {String mimeType = 'audio/wav'}) async {
+  Future<void> playBytes(Uint8List bytes, {String? mimeType}) async {
     isStopped = false;
     playedChunks.add(bytes);
   }

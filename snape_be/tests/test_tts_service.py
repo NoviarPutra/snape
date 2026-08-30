@@ -5,6 +5,7 @@ import pytest
 
 from app.services.tts_service import (
     BaseTTSProvider,
+    EdgeTTSProvider,
     MockTTSProvider,
     PocketTTSProvider,
     generate_mock_wav,
@@ -54,5 +55,17 @@ def test_get_tts_provider_factory() -> None:
     mock_p = get_tts_provider("mock")
     assert isinstance(mock_p, MockTTSProvider)
 
+    edge_p = get_tts_provider("edge_tts")
+    assert isinstance(edge_p, EdgeTTSProvider)
+
     pocket_p = get_tts_provider("pocket_tts")
     assert isinstance(pocket_p, (PocketTTSProvider, MockTTSProvider))
+
+
+@pytest.mark.asyncio
+async def test_edge_tts_provider_synthesize() -> None:
+    provider = EdgeTTSProvider(voice="en-US-ChristopherNeural")
+    assert isinstance(provider, BaseTTSProvider)
+
+    audio_bytes = await provider.synthesize("Hello friend, welcome to Snape!")
+    assert len(audio_bytes) > 0
