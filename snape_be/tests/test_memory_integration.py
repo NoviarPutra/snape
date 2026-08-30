@@ -135,28 +135,13 @@ async def test_pipeline_end_to_end_extraction_and_websocket_payload(
     )
     await db_session.commit()
 
-    class MockAioModels:
-        async def generate_content(self, **kwargs: object) -> object:
-            class MockResponse:
-                text = json.dumps(
-                    {
-                        "memories": [
-                            {"category": "preference", "content": "Loves baking sourdough bread"}
-                        ]
-                    }
-                )
-
-            return MockResponse()
-
-    class MockAio:
-        models = MockAioModels()
-
-    class MockGenaiClient:
-        aio = MockAio()
-
+    extraction_payload = json.dumps(
+        {"memories": [{"category": "preference", "content": "Loves baking sourdough bread"}]}
+    )
+    mock_extract_llm = MockLLMService(canned_tokens=[extraction_payload])
     mem_service = MemoryService(
         embedding_service=MockEmbeddingService(),
-        client=MockGenaiClient(),  # type: ignore[arg-type]
+        llm_service=mock_extract_llm,
     )
     mock_llm = MockLLMService(canned_tokens=["That's ", "wonderful!"])
     pipeline = ChatPipeline(llm_service=mock_llm, memory_service=mem_service)

@@ -177,7 +177,7 @@ class ChatPipeline:
             message_in=MessageCreate(
                 role="assistant",
                 content=full_text,
-                meta_info={"model": settings.GEMINI_MODEL},
+                meta_info={"model": settings.OMNIROUTE_MODEL},
             ),
         )
         await db.commit()

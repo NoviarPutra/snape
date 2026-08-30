@@ -1,6 +1,5 @@
 from app.core.prompt_builder import (
     DEFAULT_BUFFER_SIZE,
-    build_conversation_contents,
     build_conversation_messages,
     build_system_prompt,
 )
@@ -34,7 +33,7 @@ def test_build_system_prompt_with_user_and_memories() -> None:
     assert "software engineer in Jakarta" in prompt
 
 
-def test_build_conversation_contents_rolling_buffer() -> None:
+def test_build_conversation_messages_rolling_buffer() -> None:
     messages = [
         ChatMessage(role="user", content="Message 1"),
         ChatMessage(role="assistant", content="Message 2"),
@@ -45,34 +44,13 @@ def test_build_conversation_contents_rolling_buffer() -> None:
         ChatMessage(role="user", content="Message 7"),
     ]
 
-    contents = build_conversation_contents(
+    contents = build_conversation_messages(
         history=messages,
         current_user_message="Message 8",
         buffer_size=DEFAULT_BUFFER_SIZE,
     )
 
-    # Rolling buffer of 5 messages + current message = 6 items or 5 previous + current
+    # Rolling buffer of 5 messages + current message = 6 items
     assert len(contents) == 6
-    # Check that older messages (1, 2) were dropped
-    roles_and_texts = [(item["role"], item["parts"][0]["text"]) for item in contents]
-    assert roles_and_texts[0] == ("user", "Message 3")
-    assert roles_and_texts[-1] == ("user", "Message 8")
-
-
-def test_build_conversation_messages_openai_format() -> None:
-    messages = [
-        ChatMessage(role="user", content="Hello"),
-        ChatMessage(role="assistant", content="Hi there!"),
-        ChatMessage(role="user", content="How are you?"),
-    ]
-
-    conv_messages = build_conversation_messages(
-        history=messages,
-        current_user_message="I'm good, thanks.",
-        buffer_size=2,
-    )
-
-    assert len(conv_messages) == 3
-    assert conv_messages[0] == {"role": "assistant", "content": "Hi there!"}
-    assert conv_messages[1] == {"role": "user", "content": "How are you?"}
-    assert conv_messages[2] == {"role": "user", "content": "I'm good, thanks."}
+    assert contents[0] == {"role": "user", "content": "Message 3"}
+    assert contents[-1] == {"role": "user", "content": "Message 8"}

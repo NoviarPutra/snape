@@ -6,8 +6,6 @@ from collections.abc import AsyncGenerator
 from typing import Any
 
 import httpx
-from google import genai
-from google.genai import types
 
 from app.core.config import settings
 
@@ -74,11 +72,9 @@ class OmniRouteLLMService(BaseLLMService):
 
         for item in contents:
             role = item.get("role", "user")
-            # Convert Gemini's 'model' role to standard 'assistant'
             if role == "model":
                 role = "assistant"
 
-            # Check if contents has Gemini 'parts' or direct 'content'
             if "content" in item and isinstance(item["content"], str):
                 messages.append({"role": role, "content": item["content"]})
             elif "parts" in item and isinstance(item["parts"], list):
@@ -182,97 +178,6 @@ class OmniRouteLLMService(BaseLLMService):
                 await client.aclose()
 
 
-class GeminiLLMService(BaseLLMService):
-    """Google Gemini 2.0 Flash async streaming service using google-genai SDK."""
-
-    def __init__(
-        self,
-        api_key: str | None = None,
-        model: str | None = None,
-        client: genai.Client | None = None,
-    ) -> None:
-        self.api_key = api_key or settings.GEMINI_API_KEY
-        self.model = model or settings.GEMINI_MODEL
-        self._client: genai.Client | None = None
-
-        if client is not None:
-            self._client = client
-        elif self.api_key:
-            self._client = genai.Client(api_key=self.api_key)
-        else:
-            logger.warning("GEMINI_API_KEY is not configured. Real API calls will fail.")
-
-    def _format_gemini_contents(self, contents: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        """Normalize messages to Gemini format with parts and role mapping."""
-        gemini_contents: list[dict[str, Any]] = []
-        for item in contents:
-            role = item.get("role", "user")
-            if role == "assistant":
-                role = "model"
-            if "parts" in item:
-                gemini_contents.append({"role": role, "parts": item["parts"]})
-            elif "content" in item:
-                gemini_contents.append({"role": role, "parts": [{"text": str(item["content"])}]})
-            else:
-                gemini_contents.append({"role": role, "parts": [{"text": str(item)}]})
-        return gemini_contents
-
-    async def stream_chat(
-        self,
-        system_instruction: str,
-        contents: list[dict[str, Any]],
-        temperature: float = 0.7,
-    ) -> AsyncGenerator[str, None]:
-        """Stream tokens asynchronously from Gemini 2.0 Flash model."""
-        if self._client is None:
-            raise RuntimeError(
-                "Gemini API client is not initialized. Please provide a valid GEMINI_API_KEY."
-            )
-
-        gemini_contents = self._format_gemini_contents(contents)
-        config = types.GenerateContentConfig(
-            system_instruction=system_instruction,
-            temperature=temperature,
-        )
-
-        response = await self._client.aio.models.generate_content_stream(
-            model=self.model,
-            contents=gemini_contents,
-            config=config,
-        )
-
-        async for chunk in response:
-            if chunk.text:
-                yield chunk.text
-
-    async def generate_chat(
-        self,
-        system_instruction: str,
-        contents: list[dict[str, Any]],
-        temperature: float = 0.2,
-        response_format_json: bool = False,
-    ) -> str:
-        """Generate content non-streaming via Gemini."""
-        if self._client is None:
-            raise RuntimeError(
-                "Gemini API client is not initialized. Please provide a valid GEMINI_API_KEY."
-            )
-
-        gemini_contents = self._format_gemini_contents(contents)
-        config = types.GenerateContentConfig(
-            system_instruction=system_instruction,
-            temperature=temperature,
-            response_mime_type="application/json" if response_format_json else None,
-        )
-
-        response = await self._client.aio.models.generate_content(
-            model=self.model,
-            contents=gemini_contents,
-            config=config,
-        )
-        return response.text or ""
-
-
 class MockLLMService(BaseLLMService):
     """Deterministic mock LLM service for testing and offline development."""
 
@@ -314,7 +219,5 @@ class MockLLMService(BaseLLMService):
 
 
 def get_llm_service() -> BaseLLMService:
-    """Factory dependency providing the configured LLM service."""
-    if settings.LLM_PROVIDER == "omniroute":
-        return OmniRouteLLMService()
-    return GeminiLLMService()
+    """Factory dependency providing the configured OmniRoute LLM service."""
+    return OmniRouteLLMService()

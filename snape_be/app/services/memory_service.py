@@ -4,15 +4,13 @@ import math
 import re
 from uuid import UUID
 
-from google import genai
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
 from app.db.models import ChatMessage, UserMemory
 from app.schemas.memory import MemoryCreate, MemoryQueryResult
 from app.services.embedding_service import BaseEmbeddingService, get_embedding_service
-from app.services.llm_service import BaseLLMService, GeminiLLMService, get_llm_service
+from app.services.llm_service import BaseLLMService, get_llm_service
 
 logger = logging.getLogger(__name__)
 
@@ -71,21 +69,9 @@ class MemoryService:
         self,
         embedding_service: BaseEmbeddingService | None = None,
         llm_service: BaseLLMService | None = None,
-        client: genai.Client | None = None,
     ) -> None:
         self.embedding_service = embedding_service or get_embedding_service()
-        self.llm_service: BaseLLMService | None = llm_service
-        self._client: genai.Client | None = None
-
-        if self.llm_service is None:
-            if client is not None:
-                self._client = client
-                self.llm_service = GeminiLLMService(client=client)
-            elif settings.LLM_PROVIDER == "omniroute":
-                self.llm_service = get_llm_service()
-            elif settings.GEMINI_API_KEY:
-                self._client = genai.Client(api_key=settings.GEMINI_API_KEY)
-                self.llm_service = GeminiLLMService(client=self._client)
+        self.llm_service = llm_service or get_llm_service()
 
     async def create_memory(
         self,

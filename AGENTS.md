@@ -93,5 +93,5 @@ Maintain clear separation of concerns across both backend and frontend subprojec
 
 - **No Spaghetti Code / God Classes**: Keep controllers and widgets focused (< 250 lines per file). Extract sub-widgets and dedicated services.
 - **No Direct Business Logic in Widgets**: UI widgets only render state and trigger events on Riverpod notifiers.
-- **Zero Hardcoded Secrets**: Sensitive credentials (`GEMINI_API_KEY`, Supabase DB password) strictly live in `snape_be/.env` and must never appear in frontend code or Git commits.
+- **Zero Hardcoded Secrets**: Sensitive credentials (`OMNIROUTE_API_KEY`, Supabase DB password) strictly live in `snape_be/.env` and must never appear in frontend code or Git commits.
 - **Non-blocking Concurrency**: Heavy CPU tasks (e.g. Pocket-TTS neural synthesis) must be dispatched to thread/process executors (`loop.run_in_executor`), never blocking the async event loop.

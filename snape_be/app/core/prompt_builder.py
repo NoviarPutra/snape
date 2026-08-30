@@ -1,5 +1,3 @@
-from typing import Any
-
 from app.db.models import ChatMessage, User
 
 DEFAULT_BUFFER_SIZE = 5
@@ -69,7 +67,7 @@ def build_conversation_messages(
     current_user_message: str,
     buffer_size: int = DEFAULT_BUFFER_SIZE,
 ) -> list[dict[str, str]]:
-    """Format short-term history buffer and current user message as standard OpenAI messages."""
+    """Format short-term history buffer and current user message as standard messages."""
     recent_history = history[-buffer_size:] if buffer_size > 0 else []
     messages: list[dict[str, str]] = []
 
@@ -90,35 +88,3 @@ def build_conversation_messages(
     )
 
     return messages
-
-
-def build_conversation_contents(
-    history: list[ChatMessage],
-    current_user_message: str,
-    buffer_size: int = DEFAULT_BUFFER_SIZE,
-) -> list[dict[str, Any]]:
-    """Format short-term history buffer and current message for Gemini API.
-
-    Maps 'assistant' role to Gemini's 'model' role, taking the latest `buffer_size` messages.
-    """
-    recent_history = history[-buffer_size:] if buffer_size > 0 else []
-    contents: list[dict[str, Any]] = []
-
-    for msg in recent_history:
-        role = "model" if msg.role == "assistant" else "user"
-        contents.append(
-            {
-                "role": role,
-                "parts": [{"text": msg.content}],
-            }
-        )
-
-    # Append current turn
-    contents.append(
-        {
-            "role": "user",
-            "parts": [{"text": current_user_message}],
-        }
-    )
-
-    return contents
