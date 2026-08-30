@@ -1,17 +1,19 @@
+import '../config/app_config.dart';
+
 class ApiConstants {
   ApiConstants._();
 
-  static const String defaultHost = '127.0.0.1:8000';
-  static const String baseHttpUrl = 'http://$defaultHost/api/v1';
-  static const String baseWsUrl = 'ws://$defaultHost/ws/chat';
+  static String get defaultHost => AppConfig.backendHost;
+  static String get baseHttpUrl => AppConfig.baseHttpUrl;
+  static String get baseWsUrl => AppConfig.baseWsUrl;
 
   static String sessionMessagesUrl(String sessionId) =>
       '$baseHttpUrl/sessions/$sessionId';
-  static String sessionsUrl = '$baseHttpUrl/sessions';
-  static String memoriesUrl = '$baseHttpUrl/memories';
+  static String get sessionsUrl => '$baseHttpUrl/sessions';
+  static String get memoriesUrl => '$baseHttpUrl/memories';
   static String memoryDetailUrl(String memoryId) => '$baseHttpUrl/memories/$memoryId';
   static String chatWsUrl(String sessionId, {String? host}) {
     final effectiveHost = host ?? defaultHost;
-    return 'ws://$effectiveHost/ws/chat/$sessionId';
+    return '${AppConfig.wsScheme}://$effectiveHost/ws/chat/$sessionId';
   }
 }

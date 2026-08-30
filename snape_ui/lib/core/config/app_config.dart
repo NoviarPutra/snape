@@ -1,0 +1,48 @@
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
+class AppConfig {
+  AppConfig._();
+
+  static const String _defaultHost = '127.0.0.1:8000';
+  static const String _defaultHttpScheme = 'http';
+  static const String _defaultWsScheme = 'ws';
+
+  static String get backendHost {
+    try {
+      if (dotenv.isInitialized) {
+        return dotenv.maybeGet('BACKEND_HOST', fallback: _defaultHost) ?? _defaultHost;
+      }
+      return _defaultHost;
+    } catch (_) {
+      return _defaultHost;
+    }
+  }
+
+  static String get httpScheme {
+    try {
+      if (dotenv.isInitialized) {
+        return dotenv.maybeGet('HTTP_SCHEME', fallback: _defaultHttpScheme) ??
+            _defaultHttpScheme;
+      }
+      return _defaultHttpScheme;
+    } catch (_) {
+      return _defaultHttpScheme;
+    }
+  }
+
+  static String get wsScheme {
+    try {
+      if (dotenv.isInitialized) {
+        return dotenv.maybeGet('WS_SCHEME', fallback: _defaultWsScheme) ??
+            _defaultWsScheme;
+      }
+      return _defaultWsScheme;
+    } catch (_) {
+      return _defaultWsScheme;
+    }
+  }
+
+  static String get baseHttpUrl => '$httpScheme://$backendHost/api/v1';
+
+  static String get baseWsUrl => '$wsScheme://$backendHost/ws/chat';
+}
