@@ -1,3 +1,4 @@
+import base64
 import logging
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
@@ -11,10 +12,13 @@ from app.core.prompt_builder import (
     build_conversation_contents,
     build_system_prompt,
 )
+from app.core.text_sanitizer import sanitize_text_for_tts
 from app.schemas.message import MessageCreate
 from app.services import session_service, user_service
 from app.services.llm_service import BaseLLMService, get_llm_service
 from app.services.memory_service import MemoryService, get_memory_service
+from app.services.sentence_chunker import SentenceChunker
+from app.services.tts_service import BaseTTSProvider, get_tts_provider
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +26,14 @@ logger = logging.getLogger(__name__)
 @dataclass
 class StreamTokenEvent:
     content: str
+
+
+@dataclass
+class StreamAudioEvent:
+    sentence: str
+    audio_base64: str
+    format: str = "wav"
+    sample_rate: int = 24000
 
 
 @dataclass
@@ -33,19 +45,23 @@ class StreamDoneEvent:
     extracted_memories: list[str]
 
 
-StreamEvent = StreamTokenEvent | StreamDoneEvent
+StreamEvent = StreamTokenEvent | StreamAudioEvent | StreamDoneEvent
 
 
 class ChatPipeline:
-    """Orchestrates turn-level LLM streaming, vector recall, memory extraction, and persistence."""
+    """Orchestrates turn-level LLM streaming, vector recall, memory extraction, and audio."""
 
     def __init__(
         self,
         llm_service: BaseLLMService | None = None,
         memory_service: MemoryService | None = None,
+        tts_provider: BaseTTSProvider | None = None,
+        enable_tts: bool | None = None,
     ) -> None:
         self.llm_service = llm_service or get_llm_service()
         self.memory_service = memory_service or get_memory_service()
+        self.tts_provider = tts_provider or get_tts_provider()
+        self.enable_tts = enable_tts if enable_tts is not None else settings.ENABLE_TTS
 
     async def stream_turn(
         self,
@@ -54,7 +70,7 @@ class ChatPipeline:
         user_content: str,
         memories: list[str] | None = None,
     ) -> AsyncGenerator[StreamEvent, None]:
-        """Stream response tokens for a user turn and persist both messages."""
+        """Stream response tokens and audio chunks for a user turn and persist both messages."""
         # 1. Verify session exists
         session = await session_service.get_session_by_id(db, session_id)
         if session is None:
@@ -101,14 +117,57 @@ class ChatPipeline:
             buffer_size=DEFAULT_BUFFER_SIZE,
         )
 
-        # 7. Stream tokens from LLM
+        # 7. Stream tokens from LLM and synthesize completed sentences
+        chunker = SentenceChunker() if self.enable_tts else None
         accumulated_tokens: list[str] = []
+
         async for token in self.llm_service.stream_chat(
             system_instruction=system_instruction,
             contents=contents,
         ):
             accumulated_tokens.append(token)
             yield StreamTokenEvent(content=token)
+
+            if chunker is not None:
+                sentences = chunker.feed(token)
+                for sentence in sentences:
+                    clean_text = sanitize_text_for_tts(sentence)
+                    if clean_text:
+                        try:
+                            audio_bytes = await self.tts_provider.synthesize(clean_text)
+                            if audio_bytes:
+                                audio_base64 = base64.b64encode(audio_bytes).decode("ascii")
+                                yield StreamAudioEvent(
+                                    sentence=clean_text,
+                                    audio_base64=audio_base64,
+                                    format="wav",
+                                    sample_rate=self.tts_provider.sample_rate,
+                                )
+                        except Exception as exc:
+                            logger.warning(
+                                "TTS synthesis failed for sentence '%s': %s", clean_text, exc
+                            )
+
+        # Flush trailing sentence buffer
+        if chunker is not None:
+            flushed_sentences = chunker.flush()
+            for sentence in flushed_sentences:
+                clean_text = sanitize_text_for_tts(sentence)
+                if clean_text:
+                    try:
+                        audio_bytes = await self.tts_provider.synthesize(clean_text)
+                        if audio_bytes:
+                            audio_base64 = base64.b64encode(audio_bytes).decode("ascii")
+                            yield StreamAudioEvent(
+                                sentence=clean_text,
+                                audio_base64=audio_base64,
+                                format="wav",
+                                sample_rate=self.tts_provider.sample_rate,
+                            )
+                    except Exception as exc:
+                        logger.warning(
+                            "TTS synthesis failed for flushed sentence '%s': %s", clean_text, exc
+                        )
 
         # 8. Persist assistant response
         full_text = "".join(accumulated_tokens)

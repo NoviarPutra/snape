@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import AsyncGenerator
@@ -76,7 +77,11 @@ class GeminiLLMService(BaseLLMService):
 class MockLLMService(BaseLLMService):
     """Deterministic mock LLM service for testing and offline development."""
 
-    def __init__(self, canned_tokens: list[str] | None = None) -> None:
+    def __init__(
+        self,
+        canned_tokens: list[str] | None = None,
+        delay_per_token: float = 0.0,
+    ) -> None:
         self.canned_tokens = canned_tokens or [
             "Oh, ",
             "you went ",
@@ -84,6 +89,7 @@ class MockLLMService(BaseLLMService):
             "and bought some apples? ",
             "What kind did you pick up?",
         ]
+        self.delay_per_token = delay_per_token
 
     async def stream_chat(
         self,
@@ -91,8 +97,10 @@ class MockLLMService(BaseLLMService):
         contents: list[dict[str, Any]],
         temperature: float = 0.7,
     ) -> AsyncGenerator[str, None]:
-        """Yield canned tokens sequentially."""
+        """Yield canned tokens sequentially with optional simulated network latency."""
         for token in self.canned_tokens:
+            if self.delay_per_token > 0:
+                await asyncio.sleep(self.delay_per_token)
             yield token
 
 

@@ -1,3 +1,4 @@
+import base64
 from collections.abc import AsyncGenerator
 from uuid import uuid4
 
@@ -45,12 +46,15 @@ async def test_websocket_chat_turn(ws_app: TestClient, db_session: AsyncSession)
         websocket.send_json({"type": "chat", "content": "Yesterday I go to market"})
 
         tokens = []
+        audio_events = []
         done_payload = None
 
         while True:
             msg = websocket.receive_json()
             if msg["type"] == "token":
                 tokens.append(msg["content"])
+            elif msg["type"] == "audio":
+                audio_events.append(msg)
             elif msg["type"] == "done":
                 done_payload = msg
                 break
@@ -58,11 +62,22 @@ async def test_websocket_chat_turn(ws_app: TestClient, db_session: AsyncSession)
                 pytest.fail(f"Received unexpected error frame: {msg}")
 
         assert len(tokens) > 0
+        assert len(audio_events) >= 1
         assert done_payload is not None
         assert done_payload["session_id"] == str(session.id)
         assert done_payload["full_text"] == "".join(tokens)
         assert done_payload["user_message_id"] is not None
         assert done_payload["assistant_message_id"] is not None
+
+        # Verify audio frame structure
+        audio_frame = audio_events[0]
+        assert "sentence" in audio_frame
+        assert "audio_base64" in audio_frame
+        assert audio_frame["format"] == "wav"
+        assert audio_frame["sample_rate"] == 24000
+        decoded_audio = base64.b64decode(audio_frame["audio_base64"])
+        assert len(decoded_audio) > 44
+        assert decoded_audio.startswith(b"RIFF")
 
 
 @pytest.mark.asyncio

@@ -23,6 +23,14 @@ class WSTokenOutput(BaseModel):
     content: str = Field(..., description="Token text chunk")
 
 
+class WSAudioOutput(BaseModel):
+    type: Literal["audio"] = "audio"
+    sentence: str = Field(..., description="Synthesized sentence text")
+    audio_base64: str = Field(..., description="Base64-encoded WAV audio data")
+    format: str = Field(default="wav", description="Audio format")
+    sample_rate: int = Field(default=24000, description="Audio sample rate in Hz")
+
+
 class WSDoneOutput(BaseModel):
     type: Literal["done"] = "done"
     session_id: UUID = Field(..., description="Session identifier")
@@ -46,4 +54,4 @@ class WSPongOutput(BaseModel):
     type: Literal["pong"] = "pong"
 
 
-WSOutboundMessage = WSTokenOutput | WSDoneOutput | WSErrorOutput | WSPongOutput
+WSOutboundMessage = WSTokenOutput | WSAudioOutput | WSDoneOutput | WSErrorOutput | WSPongOutput

@@ -8,13 +8,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
 from app.schemas.websocket import (
+    WSAudioOutput,
     WSChatInput,
     WSDoneOutput,
     WSErrorOutput,
     WSPongOutput,
     WSTokenOutput,
 )
-from app.services.chat_pipeline import ChatPipeline, StreamDoneEvent, StreamTokenEvent
+from app.services.chat_pipeline import (
+    ChatPipeline,
+    StreamAudioEvent,
+    StreamDoneEvent,
+    StreamTokenEvent,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +82,14 @@ async def chat_websocket_endpoint(
                         if isinstance(event, StreamTokenEvent):
                             token_msg = WSTokenOutput(content=event.content)
                             await websocket.send_json(token_msg.model_dump())
+                        elif isinstance(event, StreamAudioEvent):
+                            audio_msg = WSAudioOutput(
+                                sentence=event.sentence,
+                                audio_base64=event.audio_base64,
+                                format=event.format,
+                                sample_rate=event.sample_rate,
+                            )
+                            await websocket.send_json(audio_msg.model_dump())
                         elif isinstance(event, StreamDoneEvent):
                             done_msg = WSDoneOutput(
                                 session_id=event.session_id,

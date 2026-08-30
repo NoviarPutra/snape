@@ -1,3 +1,4 @@
+import base64
 from uuid import uuid4
 
 import pytest
@@ -5,12 +6,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.schemas.session import SessionCreate
 from app.services import session_service, user_service
-from app.services.chat_pipeline import ChatPipeline, StreamDoneEvent, StreamTokenEvent
+from app.services.chat_pipeline import (
+    ChatPipeline,
+    StreamAudioEvent,
+    StreamDoneEvent,
+    StreamTokenEvent,
+)
 from app.services.llm_service import MockLLMService
+from app.services.tts_service import MockTTSProvider
 
 
 @pytest.mark.asyncio
-async def test_chat_pipeline_stream_turn(db_session: AsyncSession) -> None:
+async def test_chat_pipeline_stream_turn_with_tts(db_session: AsyncSession) -> None:
     # 1. Setup user and session
     user = await user_service.get_or_create_default_user(db_session)
     session = await session_service.create_session(
@@ -20,10 +27,11 @@ async def test_chat_pipeline_stream_turn(db_session: AsyncSession) -> None:
     )
     await db_session.commit()
 
-    # 2. Initialize chat pipeline with mock LLM service
-    mock_tokens = ["I ", "went ", "to ", "the ", "market."]
+    # 2. Initialize chat pipeline with mock LLM and mock TTS service
+    mock_tokens = ["I ", "went ", "to ", "the ", "market. ", "What ", "about ", "you?"]
     mock_llm = MockLLMService(canned_tokens=mock_tokens)
-    pipeline = ChatPipeline(llm_service=mock_llm)
+    mock_tts = MockTTSProvider(sample_rate=24000)
+    pipeline = ChatPipeline(llm_service=mock_llm, tts_provider=mock_tts, enable_tts=True)
 
     events = []
     async for event in pipeline.stream_turn(
@@ -35,15 +43,25 @@ async def test_chat_pipeline_stream_turn(db_session: AsyncSession) -> None:
 
     # 3. Verify yielded events
     token_events = [e for e in events if isinstance(e, StreamTokenEvent)]
+    audio_events = [e for e in events if isinstance(e, StreamAudioEvent)]
     done_events = [e for e in events if isinstance(e, StreamDoneEvent)]
 
     assert len(token_events) == len(mock_tokens)
-    assert "".join([e.content for e in token_events]) == "I went to the market."
+    assert "".join([e.content for e in token_events]) == "I went to the market. What about you?"
+
+    # Should have emitted 2 audio chunks for the 2 sentences
+    assert len(audio_events) == 2
+    assert audio_events[0].sentence == "I went to the market."
+    assert audio_events[0].format == "wav"
+    assert audio_events[0].sample_rate == 24000
+    assert len(base64.b64decode(audio_events[0].audio_base64)) > 44
+
+    assert audio_events[1].sentence == "What about you?"
 
     assert len(done_events) == 1
     done = done_events[0]
     assert done.session_id == session.id
-    assert done.full_text == "I went to the market."
+    assert done.full_text == "I went to the market. What about you?"
     assert done.user_message_id is not None
     assert done.assistant_message_id is not None
 
@@ -53,7 +71,33 @@ async def test_chat_pipeline_stream_turn(db_session: AsyncSession) -> None:
     assert recent_messages[0].role == "user"
     assert recent_messages[0].content == "Yesterday I go to market"
     assert recent_messages[1].role == "assistant"
-    assert recent_messages[1].content == "I went to the market."
+    assert recent_messages[1].content == "I went to the market. What about you?"
+
+
+@pytest.mark.asyncio
+async def test_chat_pipeline_tts_disabled(db_session: AsyncSession) -> None:
+    user = await user_service.get_or_create_default_user(db_session)
+    session = await session_service.create_session(
+        db_session,
+        user_id=user.id,
+        session_in=SessionCreate(title="No TTS Session"),
+    )
+    await db_session.commit()
+
+    mock_tokens = ["Hello ", "world."]
+    mock_llm = MockLLMService(canned_tokens=mock_tokens)
+    pipeline = ChatPipeline(llm_service=mock_llm, enable_tts=False)
+
+    events = []
+    async for event in pipeline.stream_turn(
+        db=db_session,
+        session_id=session.id,
+        user_content="Hi",
+    ):
+        events.append(event)
+
+    audio_events = [e for e in events if isinstance(e, StreamAudioEvent)]
+    assert len(audio_events) == 0
 
 
 @pytest.mark.asyncio
