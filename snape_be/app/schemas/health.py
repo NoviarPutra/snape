@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -11,5 +11,5 @@ class HealthResponse(BaseModel):
     environment: str = Field(default="development", description="Runtime environment")
     database_connected: bool = Field(default=False, description="Database connection status")
     timestamp: datetime = Field(
-        default_factory=datetime.utcnow, description="Server timestamp (UTC)"
+        default_factory=lambda: datetime.now(UTC), description="Server timestamp (UTC)"
     )

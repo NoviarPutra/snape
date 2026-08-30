@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import text
@@ -27,5 +27,5 @@ async def get_health(db: AsyncSession = Depends(get_db)) -> HealthResponse:
         version=settings.APP_VERSION,
         environment=settings.APP_ENV,
         database_connected=db_connected,
-        timestamp=datetime.utcnow(),
+        timestamp=datetime.now(UTC),
     )
