@@ -330,38 +330,43 @@ class _MemoryCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Container(
-                padding: EdgeInsets.symmetric(
-                  horizontal: AppSpacing.xs.w,
-                  vertical: 2.h,
-                ),
-                decoration: BoxDecoration(
-                  color: categoryColor.withAlpha(25),
-                  borderRadius: BorderRadius.circular(AppRadii.xs.r),
-                  border: Border.all(
-                    color: categoryColor.withAlpha(80),
-                    width: 0.5,
+              Flexible(
+                child: Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: AppSpacing.xs.w,
+                    vertical: 2.h,
+                  ),
+                  decoration: BoxDecoration(
+                    color: categoryColor.withAlpha(25),
+                    borderRadius: BorderRadius.circular(AppRadii.xs.r),
+                    border: Border.all(
+                      color: categoryColor.withAlpha(80),
+                      width: 0.5,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(categoryIcon, size: 12.r, color: categoryColor),
+                      SizedBox(width: 3.w),
+                      Flexible(
+                        child: Text(
+                          memory.category.toUpperCase(),
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 10.sp,
+                            fontWeight: FontWeight.w700,
+                            color: categoryColor,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(categoryIcon, size: 12.r, color: categoryColor),
-                    SizedBox(width: 3.w),
-                    Text(
-                      memory.category.toUpperCase(),
-                      style: TextStyle(
-                        fontSize: 10.sp,
-                        fontWeight: FontWeight.w700,
-                        color: categoryColor,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ],
-                ),
               ),
-              const Spacer(),
               IconButton(
                 icon: Icon(
                   Icons.delete_outline_rounded,

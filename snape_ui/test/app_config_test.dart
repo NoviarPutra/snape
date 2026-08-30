@@ -29,20 +29,20 @@ void main() {
     });
 
     test('uses fallback default values when uninitialized', () {
-      expect(AppConfig.backendHost, '127.0.0.1:8000');
-      expect(AppConfig.httpScheme, 'http');
-      expect(AppConfig.wsScheme, 'ws');
-      expect(AppConfig.baseHttpUrl, 'http://127.0.0.1:8000/api/v1');
-      expect(AppConfig.baseWsUrl, 'ws://127.0.0.1:8000/ws/chat');
-      expect(ApiConstants.sessionsUrl, 'http://127.0.0.1:8000/api/v1/sessions');
-      expect(ApiConstants.memoriesUrl, 'http://127.0.0.1:8000/api/v1/memories');
+      expect(AppConfig.backendHost, 'uncontinual-julieann-corymbosely.ngrok-free.dev');
+      expect(AppConfig.httpScheme, 'https');
+      expect(AppConfig.wsScheme, 'wss');
+      expect(AppConfig.baseHttpUrl, 'https://uncontinual-julieann-corymbosely.ngrok-free.dev/api/v1');
+      expect(AppConfig.baseWsUrl, 'wss://uncontinual-julieann-corymbosely.ngrok-free.dev/ws/chat');
+      expect(ApiConstants.sessionsUrl, 'https://uncontinual-julieann-corymbosely.ngrok-free.dev/api/v1/sessions');
+      expect(ApiConstants.memoriesUrl, 'https://uncontinual-julieann-corymbosely.ngrok-free.dev/api/v1/memories');
       expect(
         ApiConstants.sessionMessagesUrl('test-session-123'),
-        'http://127.0.0.1:8000/api/v1/sessions/test-session-123',
+        'https://uncontinual-julieann-corymbosely.ngrok-free.dev/api/v1/sessions/test-session-123',
       );
       expect(
         ApiConstants.chatWsUrl('test-session-123'),
-        'ws://127.0.0.1:8000/ws/chat/test-session-123',
+        'wss://uncontinual-julieann-corymbosely.ngrok-free.dev/ws/chat/test-session-123',
       );
     });
 

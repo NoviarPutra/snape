@@ -184,6 +184,11 @@ void main() {
   group('MemoryDrawer Widget', () {
     testWidgets('renders memory drawer with items and category badges',
         (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
       final fakeRepo = FakeMemoryRepository()
         ..items = [
           MemoryItem(
@@ -221,6 +226,11 @@ void main() {
 
     testWidgets('renders empty state when no memories are stored',
         (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
       final fakeRepo = FakeMemoryRepository()..items = [];
 
       await tester.pumpWidget(
