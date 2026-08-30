@@ -32,6 +32,12 @@ htmlcov/
 # Scratch & local testing
 .scratch/
 
+# Flutter non-mobile platforms (Keep Android & iOS only)
+snape_ui/linux/
+snape_ui/macos/
+snape_ui/windows/
+snape_ui/web/
+
 # IDE / Editors
 .vscode/
 .idea/
