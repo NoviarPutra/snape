@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """
-Utility script to apply Supabase SQL schema migrations to Supabase PostgreSQL using environment variables.
+Utility script to apply Supabase SQL schema migrations to Supabase PostgreSQL.
 """
+
 import os
 import sys
 from pathlib import Path
 from urllib.parse import urlparse
+
 from dotenv import load_dotenv
 
 # Base directory paths
@@ -30,7 +32,7 @@ if not DATABASE_URL:
     if host and password:
         DATABASE_URL = f"postgresql://{user}:{password}@{host}:{port}/{dbname}?sslmode=require"
     else:
-        print("❌ Error: DATABASE_URL or SUPABASE_DB_PASSWORD is not set in environment or snape_be/.env file.")
+        print("❌ Error: DATABASE_URL or SUPABASE_DB_PASSWORD is not set in environment or .env.")
         sys.exit(1)
 
 # Ensure synchronous psycopg2 connection string format
@@ -44,7 +46,7 @@ def apply_migration():
     try:
         import psycopg2
     except ImportError:
-        print("❌ psycopg2 is not installed. Please install it via: pip install psycopg2-binary python-dotenv")
+        print("❌ psycopg2 is not installed. Run: pip install psycopg2-binary python-dotenv")
         sys.exit(1)
 
     parsed = urlparse(DATABASE_URL)
@@ -58,7 +60,7 @@ def apply_migration():
         conn = psycopg2.connect(DATABASE_URL)
         conn.autocommit = True
         with conn.cursor() as cur:
-            with open(MIGRATION_FILE, "r") as f:
+            with open(MIGRATION_FILE) as f:
                 sql = f.read()
             print("Executing migration SQL script...")
             cur.execute(sql)
