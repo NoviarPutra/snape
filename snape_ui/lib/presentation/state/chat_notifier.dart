@@ -2,10 +2,10 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../../data/models/websocket_events.dart';
-import '../../data/repositories/chat_repository_impl.dart';
 import '../../domain/models/chat_message.dart';
+import '../../domain/repositories/chat_repository.dart';
 import 'chat_state.dart';
-import 'session_notifier.dart';
+import 'providers.dart';
 
 class ChatNotifier extends StateNotifier<ChatState> {
   final ChatRepository _repository;
@@ -72,7 +72,6 @@ class ChatNotifier extends StateNotifier<ChatState> {
       clearStreamingId: true,
     );
 
-    // 1. Fetch History from REST
     try {
       final history = await _repository.getSessionHistory(sessionId);
       state = state.copyWith(
@@ -86,7 +85,6 @@ class ChatNotifier extends StateNotifier<ChatState> {
       );
     }
 
-    // 2. Connect WebSocket
     await _connectWebSocket(sessionId);
   }
 
@@ -167,7 +165,6 @@ class ChatNotifier extends StateNotifier<ChatState> {
     try {
       _repository.sendChatMessage(trimmed);
     } catch (e) {
-      // Mark assistant placeholder as error
       final listWithError = state.messages.map((m) {
         if (m.id == streamingAssistantId) {
           return m.copyWith(
@@ -193,7 +190,6 @@ class ChatNotifier extends StateNotifier<ChatState> {
       case WSTokenEvent(:final content):
         _onTokenReceived(content);
       case WSAudioEvent():
-        // Audio chunk received (will be handled by TTS audio player in issue 06)
         break;
       case WSDoneEvent(
           :final fullText,

@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:snape_ui/data/models/websocket_events.dart';
-import 'package:snape_ui/data/repositories/chat_repository_impl.dart';
 import 'package:snape_ui/domain/models/chat_message.dart';
 import 'package:snape_ui/domain/models/session.dart';
+import 'package:snape_ui/domain/repositories/chat_repository.dart';
 import 'package:snape_ui/presentation/state/chat_notifier.dart';
 import 'package:snape_ui/presentation/state/chat_state.dart';
 
