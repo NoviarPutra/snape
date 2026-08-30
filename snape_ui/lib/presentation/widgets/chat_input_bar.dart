@@ -129,12 +129,11 @@ class _ChatInputBarState extends State<ChatInputBar> {
             ),
           ),
           SizedBox(width: AppSpacing.xs.w),
-          // Text Input Field (Expands vertically with multiline input)
+          // Text Input Field (Expands vertically dynamically with unlimited lines)
           Expanded(
             child: Container(
               constraints: BoxConstraints(
                 minHeight: buttonSize,
-                maxHeight: 120.h,
               ),
               decoration: BoxDecoration(
                 color: AppColors.surfaceCard,
@@ -149,9 +148,8 @@ class _ChatInputBarState extends State<ChatInputBar> {
               child: TextField(
                 controller: _effectiveController,
                 minLines: 1,
-                maxLines: 4,
-                textInputAction: TextInputAction.send,
-                onSubmitted: (_) => _handleSubmit(),
+                maxLines: null,
+                keyboardType: TextInputType.multiline,
                 style: AppTypography.input,
                 textAlignVertical: TextAlignVertical.center,
                 decoration: InputDecoration(
