@@ -1,0 +1,91 @@
+from uuid import uuid4
+
+import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.db.session import get_db
+from app.main import create_app
+from app.schemas.session import SessionCreate
+from app.services import session_service, user_service
+
+
+@pytest.fixture
+def ws_app(db_session: AsyncSession) -> TestClient:
+    app = create_app()
+
+    # Override get_db to use db_session
+    async def override_get_db():
+        yield db_session
+
+    app.dependency_overrides[get_db] = override_get_db
+    return TestClient(app)
+
+
+@pytest.mark.asyncio
+async def test_websocket_chat_turn(ws_app: TestClient, db_session: AsyncSession) -> None:
+    # 1. Prepare user and session in db
+    user = await user_service.get_or_create_default_user(db_session)
+    session = await session_service.create_session(
+        db_session,
+        user_id=user.id,
+        session_in=SessionCreate(title="WebSocket Chat Test"),
+    )
+    await db_session.commit()
+
+    # 2. Connect to WebSocket
+    with ws_app.websocket_connect(f"/ws/chat/{session.id}") as websocket:
+        # Ping - Pong test
+        websocket.send_json({"type": "ping"})
+        pong_response = websocket.receive_json()
+        assert pong_response["type"] == "pong"
+
+        # Chat message turn
+        websocket.send_json({"type": "chat", "content": "Yesterday I go to market"})
+
+        tokens = []
+        done_payload = None
+
+        while True:
+            msg = websocket.receive_json()
+            if msg["type"] == "token":
+                tokens.append(msg["content"])
+            elif msg["type"] == "done":
+                done_payload = msg
+                break
+            elif msg["type"] == "error":
+                pytest.fail(f"Received unexpected error frame: {msg}")
+
+        assert len(tokens) > 0
+        assert done_payload is not None
+        assert done_payload["session_id"] == str(session.id)
+        assert done_payload["full_text"] == "".join(tokens)
+        assert done_payload["user_message_id"] is not None
+        assert done_payload["assistant_message_id"] is not None
+
+
+@pytest.mark.asyncio
+async def test_websocket_invalid_session(ws_app: TestClient) -> None:
+    random_session_id = uuid4()
+    with ws_app.websocket_connect(f"/ws/chat/{random_session_id}") as websocket:
+        websocket.send_json({"type": "chat", "content": "Hello"})
+        msg = websocket.receive_json()
+        assert msg["type"] == "error"
+        assert "Session not found" in msg["message"]
+
+
+@pytest.mark.asyncio
+async def test_websocket_invalid_format(ws_app: TestClient, db_session: AsyncSession) -> None:
+    user = await user_service.get_or_create_default_user(db_session)
+    session = await session_service.create_session(
+        db_session,
+        user_id=user.id,
+        session_in=SessionCreate(title="Format Test"),
+    )
+    await db_session.commit()
+
+    with ws_app.websocket_connect(f"/ws/chat/{session.id}") as websocket:
+        websocket.send_text("not a valid json")
+        msg = websocket.receive_json()
+        assert msg["type"] == "error"
+        assert msg["code"] == "INVALID_JSON"

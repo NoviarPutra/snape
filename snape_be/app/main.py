@@ -40,6 +40,10 @@ def create_app() -> FastAPI:
 
     # Include API Routers
     app.include_router(api_v1_router, prefix=settings.API_V1_STR)
+    # Direct WebSocket route at /ws/chat/{session_id}
+    from app.api.v1.chat_ws import router as ws_router
+
+    app.include_router(ws_router)
 
     return app
 

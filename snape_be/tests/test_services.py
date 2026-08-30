@@ -78,7 +78,7 @@ async def test_session_service_operations(db_session: AsyncSession) -> None:
     assert msg1.id is not None
     assert msg2.id is not None
 
-    # 4. Get session with messages
+    # 4. Get session with messages and test get_recent_messages
     detailed = await session_service.get_session_by_id(
         db_session, session.id, include_messages=True
     )
@@ -86,6 +86,11 @@ async def test_session_service_operations(db_session: AsyncSession) -> None:
     assert len(detailed.messages) == 2
     assert detailed.messages[0].content == "Hello!"
     assert detailed.messages[1].content == "Hi there! How can I help?"
+
+    recent = await session_service.get_recent_messages(db_session, session.id, limit=5)
+    assert len(recent) == 2
+    assert recent[0].content == "Hello!"
+    assert recent[1].content == "Hi there! How can I help?"
 
     # 5. Update session
     updated = await session_service.update_session(

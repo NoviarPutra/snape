@@ -14,6 +14,9 @@ __pycache__/
 env/
 venv/
 .venv/
+.pytest_cache/
+.coverage
+htmlcov/
 
 # Scratch & local testing
 .scratch/

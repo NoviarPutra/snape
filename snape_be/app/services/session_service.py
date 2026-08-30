@@ -83,3 +83,20 @@ async def add_message(db: AsyncSession, session_id: UUID, message_in: MessageCre
     await db.flush()
     await db.refresh(message)
     return message
+
+
+async def get_recent_messages(
+    db: AsyncSession, session_id: UUID, limit: int = 5
+) -> list[ChatMessage]:
+    """Retrieve the most recent messages for a session in chronological order."""
+    stmt = (
+        select(ChatMessage)
+        .where(ChatMessage.session_id == session_id)
+        .order_by(desc(ChatMessage.created_at))
+        .limit(limit)
+    )
+    result = await db.execute(stmt)
+    messages = list(result.scalars().all())
+    messages.reverse()
+    return messages
+
