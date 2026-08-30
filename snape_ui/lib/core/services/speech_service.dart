@@ -57,9 +57,11 @@ class SpeechService implements BaseSpeechService {
             onListeningStateChanged?.call(false);
           }
         },
-        listenMode: stt.ListenMode.dictation,
-        localeId: 'en_US',
-        pauseFor: const Duration(seconds: 3),
+        listenOptions: stt.SpeechListenOptions(
+          listenMode: stt.ListenMode.dictation,
+          pauseFor: const Duration(seconds: 3),
+          localeId: 'en_US',
+        ),
       );
     } catch (e) {
       debugPrint('Speech listening error: $e');
