@@ -58,4 +58,3 @@ async def test_get_embedding_service_factory() -> None:
     """Factory should return BaseEmbeddingService instance."""
     service = get_embedding_service()
     assert isinstance(service, BaseEmbeddingService)
-

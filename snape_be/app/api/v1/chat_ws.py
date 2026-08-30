@@ -98,9 +98,7 @@ async def chat_websocket_endpoint(
                                 full_text=event.full_text,
                                 extracted_memories=event.extracted_memories,
                             )
-                            await websocket.send_json(
-                                done_msg.model_dump(mode="json")
-                            )
+                            await websocket.send_json(done_msg.model_dump(mode="json"))
                 except ValueError as err:
                     await websocket.send_json(
                         WSErrorOutput(

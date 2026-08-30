@@ -3,19 +3,19 @@ import re
 # Comprehensive Unicode pattern for emojis and miscellaneous symbols
 EMOJI_PATTERN = re.compile(
     "["
-    "\U0001F600-\U0001F64F"  # Emoticons
-    "\U0001F300-\U0001F5FF"  # Miscellaneous symbols & pictographs
-    "\U0001F680-\U0001F6FF"  # Transport and map symbols
-    "\U0001F1E0-\U0001F1FF"  # Regional indicator symbols (Flags)
-    "\U00002702-\U000027B0"  # Dingbats
-    "\U000024C2-\U0001F251"  # Enclosed characters
-    "\U0001F900-\U0001F9FF"  # Supplemental symbols and pictographs
-    "\U0001FA00-\U0001FA6F"  # Chess symbols
-    "\U0001FA70-\U0001FAFF"  # Symbols and pictographs extended-a
-    "\U00002600-\U000026FF"  # Miscellaneous symbols
-    "\U0000FE00-\U0000FE0F"  # Variation selectors
-    "\U0001F000-\U0001F02F"  # Mahjong tiles
-    "\U0001F0A0-\U0001F0FF"  # Playing cards
+    "\U0001f600-\U0001f64f"  # Emoticons
+    "\U0001f300-\U0001f5ff"  # Miscellaneous symbols & pictographs
+    "\U0001f680-\U0001f6ff"  # Transport and map symbols
+    "\U0001f1e0-\U0001f1ff"  # Regional indicator symbols (Flags)
+    "\U00002702-\U000027b0"  # Dingbats
+    "\U000024c2-\U0001f251"  # Enclosed characters
+    "\U0001f900-\U0001f9ff"  # Supplemental symbols and pictographs
+    "\U0001fa00-\U0001fa6f"  # Chess symbols
+    "\U0001fa70-\U0001faff"  # Symbols and pictographs extended-a
+    "\U00002600-\U000026ff"  # Miscellaneous symbols
+    "\U0000fe00-\U0000fe0f"  # Variation selectors
+    "\U0001f000-\U0001f02f"  # Mahjong tiles
+    "\U0001f0a0-\U0001f0ff"  # Playing cards
     "]+",
     flags=re.UNICODE,
 )

@@ -128,10 +128,12 @@ async def test_multi_turn_history_buffering(db_session: AsyncSession) -> None:
             contents: list[dict[str, Any]],
             temperature: float = 0.7,
         ) -> AsyncGenerator[str, None]:
-            self.calls.append({
-                "system_instruction": system_instruction,
-                "contents": contents,
-            })
+            self.calls.append(
+                {
+                    "system_instruction": system_instruction,
+                    "contents": contents,
+                }
+            )
             yield "Response"
 
     inspecting_llm = InspectingLLMService()
@@ -153,4 +155,6 @@ async def test_multi_turn_history_buffering(db_session: AsyncSession) -> None:
     call_4_contents = inspecting_llm.calls[3]["contents"]
     assert len(call_4_contents) == 6
     # Last item in buffer for 4th call should be current message (User message 4)
-    assert call_4_contents[-1]["parts"][0]["text"] == "User message 4"
+    last_msg = call_4_contents[-1]
+    msg_text = last_msg.get("content") or last_msg.get("parts", [{}])[0].get("text")
+    assert msg_text == "User message 4"

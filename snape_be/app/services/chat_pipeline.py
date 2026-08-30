@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.prompt_builder import (
     DEFAULT_BUFFER_SIZE,
-    build_conversation_contents,
+    build_conversation_messages,
     build_system_prompt,
 )
 from app.core.text_sanitizer import sanitize_text_for_tts
@@ -109,9 +109,9 @@ class ChatPipeline:
         )
         await db.commit()
 
-        # 6. Build dynamic system prompt and structured contents
+        # 6. Build dynamic system prompt and structured messages
         system_instruction = build_system_prompt(user=user, memories=recalled_memories)
-        contents = build_conversation_contents(
+        messages = build_conversation_messages(
             history=recent_history,
             current_user_message=user_content,
             buffer_size=DEFAULT_BUFFER_SIZE,
@@ -123,7 +123,7 @@ class ChatPipeline:
 
         async for token in self.llm_service.stream_chat(
             system_instruction=system_instruction,
-            contents=contents,
+            contents=messages,
         ):
             accumulated_tokens.append(token)
             yield StreamTokenEvent(content=token)

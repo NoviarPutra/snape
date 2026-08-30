@@ -55,9 +55,9 @@ async def test_first_sentence_audio_latency_under_1_5s(db_session: AsyncSession)
     assert first_sentence_audio_time is not None
     assert first_audio_sentence == "That sounds wonderful!"
     # Must be synthesized well under 1.5s
-    assert (
-        first_sentence_audio_time < 1.5
-    ), f"Audio latency {first_sentence_audio_time:.3f}s exceeded 1.5s"
+    assert first_sentence_audio_time < 1.5, (
+        f"Audio latency {first_sentence_audio_time:.3f}s exceeded 1.5s"
+    )
 
 
 @pytest.mark.asyncio

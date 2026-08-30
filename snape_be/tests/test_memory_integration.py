@@ -138,11 +138,14 @@ async def test_pipeline_end_to_end_extraction_and_websocket_payload(
     class MockAioModels:
         async def generate_content(self, **kwargs: object) -> object:
             class MockResponse:
-                text = json.dumps({
-                    "memories": [
-                        {"category": "preference", "content": "Loves baking sourdough bread"}
-                    ]
-                })
+                text = json.dumps(
+                    {
+                        "memories": [
+                            {"category": "preference", "content": "Loves baking sourdough bread"}
+                        ]
+                    }
+                )
+
             return MockResponse()
 
     class MockAio:
@@ -175,4 +178,3 @@ async def test_pipeline_end_to_end_extraction_and_websocket_payload(
     assert len(memories) == 1
     assert memories[0].content == "Loves baking sourdough bread"
     assert memories[0].category == "preference"
-

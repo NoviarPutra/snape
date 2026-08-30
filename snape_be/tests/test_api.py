@@ -108,9 +108,7 @@ async def test_memory_endpoints(client: AsyncClient, db_session: AsyncSession) -
     user_id = UUID(user_res.json()["id"])
 
     mem_service = get_memory_service()
-    emb1 = await mem_service.embedding_service.generate_embedding(
-        "Enjoys hiking on mountains"
-    )
+    emb1 = await mem_service.embedding_service.generate_embedding("Enjoys hiking on mountains")
     emb2 = await mem_service.embedding_service.generate_embedding(
         "Wants to pass IELTS with band 7.5"
     )
@@ -167,4 +165,3 @@ async def test_memory_endpoints(client: AsyncClient, db_session: AsyncSession) -
     # 7. Deleting already deleted / nonexistent memory returns 404
     del_res_404 = await client.delete(f"/api/v1/memories/{mem1.id}")
     assert del_res_404.status_code == 404
-

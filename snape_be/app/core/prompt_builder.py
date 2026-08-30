@@ -64,6 +64,34 @@ def build_system_prompt(
     return "\n\n".join(sections)
 
 
+def build_conversation_messages(
+    history: list[ChatMessage],
+    current_user_message: str,
+    buffer_size: int = DEFAULT_BUFFER_SIZE,
+) -> list[dict[str, str]]:
+    """Format short-term history buffer and current user message as standard OpenAI messages."""
+    recent_history = history[-buffer_size:] if buffer_size > 0 else []
+    messages: list[dict[str, str]] = []
+
+    for msg in recent_history:
+        role = "assistant" if msg.role == "assistant" else "user"
+        messages.append(
+            {
+                "role": role,
+                "content": msg.content,
+            }
+        )
+
+    messages.append(
+        {
+            "role": "user",
+            "content": current_user_message,
+        }
+    )
+
+    return messages
+
+
 def build_conversation_contents(
     history: list[ChatMessage],
     current_user_message: str,
@@ -78,15 +106,19 @@ def build_conversation_contents(
 
     for msg in recent_history:
         role = "model" if msg.role == "assistant" else "user"
-        contents.append({
-            "role": role,
-            "parts": [{"text": msg.content}],
-        })
+        contents.append(
+            {
+                "role": role,
+                "parts": [{"text": msg.content}],
+            }
+        )
 
     # Append current turn
-    contents.append({
-        "role": "user",
-        "parts": [{"text": current_user_message}],
-    })
+    contents.append(
+        {
+            "role": "user",
+            "parts": [{"text": current_user_message}],
+        }
+    )
 
     return contents

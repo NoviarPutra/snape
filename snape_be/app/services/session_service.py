@@ -99,4 +99,3 @@ async def get_recent_messages(
     messages = list(result.scalars().all())
     messages.reverse()
     return messages
-

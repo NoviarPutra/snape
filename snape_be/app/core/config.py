@@ -39,7 +39,13 @@ class Settings(BaseSettings):
     DB_POOL_TIMEOUT: int = 30
     DB_POOL_RECYCLE: int = 300
 
-    # Gemini & Embedding
+    # LLM & OmniRoute Gateway
+    LLM_PROVIDER: str = "omniroute"
+    OMNIROUTE_BASE_URL: str = "http://localhost:20128/v1"
+    OMNIROUTE_API_KEY: str = Field(default="", description="OmniRoute API key")
+    OMNIROUTE_MODEL: str = "antigravity/gemini-3.7-flash-high"
+
+    # Gemini (Fallback / Legacy) & Embedding
     GEMINI_API_KEY: str = Field(default="", description="Google Gemini API key")
     GEMINI_MODEL: str = "gemini-2.0-flash"
     EMBEDDING_MODEL: str = "text-embedding-004"

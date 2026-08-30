@@ -1,10 +1,10 @@
 import json
 import logging
 import math
+import re
 from uuid import UUID
 
 from google import genai
-from google.genai import types
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,6 +12,7 @@ from app.core.config import settings
 from app.db.models import ChatMessage, UserMemory
 from app.schemas.memory import MemoryCreate, MemoryQueryResult
 from app.services.embedding_service import BaseEmbeddingService, get_embedding_service
+from app.services.llm_service import BaseLLMService, GeminiLLMService, get_llm_service
 
 logger = logging.getLogger(__name__)
 
@@ -69,15 +70,22 @@ class MemoryService:
     def __init__(
         self,
         embedding_service: BaseEmbeddingService | None = None,
+        llm_service: BaseLLMService | None = None,
         client: genai.Client | None = None,
     ) -> None:
         self.embedding_service = embedding_service or get_embedding_service()
+        self.llm_service: BaseLLMService | None = llm_service
         self._client: genai.Client | None = None
 
-        if client is not None:
-            self._client = client
-        elif settings.GEMINI_API_KEY:
-            self._client = genai.Client(api_key=settings.GEMINI_API_KEY)
+        if self.llm_service is None:
+            if client is not None:
+                self._client = client
+                self.llm_service = GeminiLLMService(client=client)
+            elif settings.LLM_PROVIDER == "omniroute":
+                self.llm_service = get_llm_service()
+            elif settings.GEMINI_API_KEY:
+                self._client = genai.Client(api_key=settings.GEMINI_API_KEY)
+                self.llm_service = GeminiLLMService(client=self._client)
 
     async def create_memory(
         self,
@@ -238,9 +246,9 @@ class MemoryService:
         user_content: str,
         recent_history: list[ChatMessage] | None = None,
     ) -> list[dict[str, str]]:
-        """Extract atomic user facts, preferences, goals, or experiences using Gemini."""
-        if not self._client:
-            logger.debug("Gemini client unavailable for memory extraction.")
+        """Extract atomic user facts, preferences, goals, or experiences using configured LLM."""
+        if not self.llm_service:
+            logger.debug("LLM service unavailable for memory extraction.")
             return []
 
         context_lines: list[str] = []
@@ -250,23 +258,25 @@ class MemoryService:
 
         prompt = f"Context:\n{chr(10).join(context_lines)}\n\nLatest User Message:\n{user_content}"
 
-        config = types.GenerateContentConfig(
-            system_instruction=MEMORY_EXTRACTION_SYSTEM_PROMPT,
-            temperature=0.2,
-            response_mime_type="application/json",
-        )
-
         try:
-            response = await self._client.aio.models.generate_content(
-                model=settings.GEMINI_MODEL,
-                contents=prompt,
-                config=config,
+            raw_text = await self.llm_service.generate_chat(
+                system_instruction=MEMORY_EXTRACTION_SYSTEM_PROMPT,
+                contents=[{"role": "user", "content": prompt}],
+                temperature=0.2,
+                response_format_json=True,
             )
 
-            if not response.text:
+            if not raw_text:
                 return []
 
-            data = json.loads(response.text)
+            cleaned = raw_text.strip()
+            # Strip markdown code fencing if returned by model
+            if cleaned.startswith("```"):
+                fence_match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", cleaned)
+                if fence_match:
+                    cleaned = fence_match.group(1).strip()
+
+            data = json.loads(cleaned)
             raw_memories = data.get("memories", [])
             valid_extracted: list[dict[str, str]] = []
 
@@ -278,7 +288,7 @@ class MemoryService:
 
             return valid_extracted
         except Exception as exc:
-            logger.warning("Failed to extract memories via Gemini LLM: %s", exc)
+            logger.warning("Failed to extract memories via LLM: %s", exc)
             return []
 
     async def extract_and_persist(

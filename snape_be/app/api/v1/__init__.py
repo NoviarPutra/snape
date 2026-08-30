@@ -9,5 +9,3 @@ api_v1_router.include_router(user.router)
 api_v1_router.include_router(sessions.router)
 api_v1_router.include_router(memories.router)
 api_v1_router.include_router(chat_ws.router)
-
-

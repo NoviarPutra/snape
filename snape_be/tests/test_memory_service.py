@@ -1,6 +1,7 @@
 import json
 import math
 import uuid
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import User
 from app.schemas.memory import MemoryCreate
 from app.services.embedding_service import MockEmbeddingService
+from app.services.llm_service import BaseLLMService, MockLLMService
 from app.services.memory_service import MemoryService, cosine_similarity
 
 
@@ -42,9 +44,7 @@ async def test_memory_crud_and_pagination(db_session: AsyncSession) -> None:
 
     mem_service = MemoryService(embedding_service=MockEmbeddingService())
 
-    emb1 = await mem_service.embedding_service.generate_embedding(
-        "Lives in Bandung, Indonesia"
-    )
+    emb1 = await mem_service.embedding_service.generate_embedding("Lives in Bandung, Indonesia")
     emb2 = await mem_service.embedding_service.generate_embedding(
         "Prefers drinking black coffee without sugar"
     )
@@ -101,9 +101,7 @@ async def test_memory_crud_and_pagination(db_session: AsyncSession) -> None:
     assert remaining[0].id == mem2.id
 
     # Delete non-existent returns False
-    not_found = await mem_service.delete_memory(
-        db_session, memory_id=uuid.uuid4(), user_id=user.id
-    )
+    not_found = await mem_service.delete_memory(db_session, memory_id=uuid.uuid4(), user_id=user.id)
     assert not_found is False
 
 
@@ -246,32 +244,28 @@ async def test_memory_deduplication(db_session: AsyncSession) -> None:
 
 @pytest.mark.asyncio
 async def test_extract_and_persist_success(db_session: AsyncSession) -> None:
-    """Test extracting and persisting memories with a mocked Gemini client."""
+    """Test extracting and persisting memories with a mocked LLM service."""
     user = User(username="extract_user", native_language="Indonesian", english_level="Intermediate")
     db_session.add(user)
     await db_session.commit()
     await db_session.refresh(user)
 
-    class MockAioModels:
-        async def generate_content(self, **kwargs: object) -> object:
-            class MockResponse:
-                text = json.dumps({
+    mock_llm = MockLLMService(
+        canned_tokens=[
+            json.dumps(
+                {
                     "memories": [
                         {"category": "fact", "content": "Works as an architect in Surabaya"},
                         {"category": "preference", "content": "Prefers tea over coffee"},
                     ]
-                })
-            return MockResponse()
-
-    class MockAio:
-        models = MockAioModels()
-
-    class MockGenaiClient:
-        aio = MockAio()
+                }
+            )
+        ]
+    )
 
     mem_service = MemoryService(
         embedding_service=MockEmbeddingService(),
-        client=MockGenaiClient(),  # type: ignore[arg-type]
+        llm_service=mock_llm,
     )
 
     extracted = await mem_service.extract_and_persist(
@@ -301,19 +295,14 @@ async def test_extract_and_persist_fault_tolerance(db_session: AsyncSession) -> 
     await db_session.commit()
     await db_session.refresh(user)
 
-    class FailingAioModels:
-        async def generate_content(self, **kwargs: object) -> object:
-            raise RuntimeError("API quota exceeded or network timeout")
-
-    class FailingAio:
-        models = FailingAioModels()
-
-    class FailingGenaiClient:
-        aio = FailingAio()
+    failing_llm = MagicMock(spec=BaseLLMService)
+    failing_llm.generate_chat = AsyncMock(
+        side_effect=RuntimeError("API quota exceeded or network timeout")
+    )
 
     mem_service = MemoryService(
         embedding_service=MockEmbeddingService(),
-        client=FailingGenaiClient(),  # type: ignore[arg-type]
+        llm_service=failing_llm,
     )
 
     # Should not raise, should return empty list
@@ -327,4 +316,3 @@ async def test_extract_and_persist_fault_tolerance(db_session: AsyncSession) -> 
     # DB state remains valid
     db_memories = await mem_service.get_memories(db_session, user_id=user.id)
     assert len(db_memories) == 0
-
