@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../../core/config/app_config.dart';
 import '../../core/constants/api_constants.dart';
 import '../../domain/models/memory_item.dart';
 
@@ -27,7 +28,7 @@ class MemoryRemoteDataSource {
     }
 
     final uri = Uri.parse('$_baseHttpUrl/memories').replace(queryParameters: queryParams);
-    final response = await _client.get(uri);
+    final response = await _client.get(uri, headers: AppConfig.defaultHeaders);
 
     if (response.statusCode >= 200 && response.statusCode < 300) {
       final List<dynamic> list = json.decode(response.body) as List<dynamic>;
@@ -41,7 +42,7 @@ class MemoryRemoteDataSource {
 
   Future<void> deleteMemory(String memoryId) async {
     final uri = Uri.parse('$_baseHttpUrl/memories/$memoryId');
-    final response = await _client.delete(uri);
+    final response = await _client.delete(uri, headers: AppConfig.defaultHeaders);
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw Exception('Failed to delete memory: ${response.statusCode}');

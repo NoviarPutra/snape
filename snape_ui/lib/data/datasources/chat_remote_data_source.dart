@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../../core/config/app_config.dart';
 import '../../core/constants/api_constants.dart';
 import '../../domain/models/chat_message.dart';
 import '../../domain/models/session.dart';
@@ -16,7 +17,7 @@ class ChatRemoteDataSource {
 
   Future<List<SessionModel>> getSessions({int limit = 50, int offset = 0}) async {
     final uri = Uri.parse('$_baseHttpUrl/sessions?limit=$limit&offset=$offset');
-    final response = await _client.get(uri);
+    final response = await _client.get(uri, headers: AppConfig.defaultHeaders);
 
     if (response.statusCode >= 200 && response.statusCode < 300) {
       final List<dynamic> list = json.decode(response.body) as List<dynamic>;
@@ -32,7 +33,7 @@ class ChatRemoteDataSource {
     final uri = Uri.parse('$_baseHttpUrl/sessions');
     final response = await _client.post(
       uri,
-      headers: {'Content-Type': 'application/json'},
+      headers: AppConfig.defaultHeaders,
       body: json.encode({'title': title}),
     );
 
@@ -46,7 +47,7 @@ class ChatRemoteDataSource {
 
   Future<List<ChatMessage>> getSessionMessages(String sessionId) async {
     final uri = Uri.parse('$_baseHttpUrl/sessions/$sessionId');
-    final response = await _client.get(uri);
+    final response = await _client.get(uri, headers: AppConfig.defaultHeaders);
 
     if (response.statusCode >= 200 && response.statusCode < 300) {
       final Map<String, dynamic> data = json.decode(response.body) as Map<String, dynamic>;
@@ -61,7 +62,7 @@ class ChatRemoteDataSource {
 
   Future<void> deleteSession(String sessionId) async {
     final uri = Uri.parse('$_baseHttpUrl/sessions/$sessionId');
-    final response = await _client.delete(uri);
+    final response = await _client.delete(uri, headers: AppConfig.defaultHeaders);
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw Exception('Failed to delete session: ${response.statusCode}');

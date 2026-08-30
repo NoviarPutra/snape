@@ -3,9 +3,9 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 class AppConfig {
   AppConfig._();
 
-  static const String _defaultHost = '127.0.0.1:8000';
-  static const String _defaultHttpScheme = 'http';
-  static const String _defaultWsScheme = 'ws';
+  static const String _defaultHost = 'uncontinual-julieann-corymbosely.ngrok-free.dev';
+  static const String _defaultHttpScheme = 'https';
+  static const String _defaultWsScheme = 'wss';
 
   static String get backendHost {
     try {
@@ -45,4 +45,9 @@ class AppConfig {
   static String get baseHttpUrl => '$httpScheme://$backendHost/api/v1';
 
   static String get baseWsUrl => '$wsScheme://$backendHost/ws/chat';
+
+  static const Map<String, String> defaultHeaders = {
+    'Content-Type': 'application/json',
+    'ngrok-skip-browser-warning': 'true',
+  };
 }
