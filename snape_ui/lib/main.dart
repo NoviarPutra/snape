@@ -10,15 +10,14 @@ Future<void> runSnapeApp(Flavor flavor) async {
   WidgetsFlutterBinding.ensureInitialized();
   F.appFlavor = flavor;
 
-  // Try loading flavor-specific .env first, then fallback to .env
+  // Load flavor-specific environment configuration
   try {
     await dotenv.load(
       fileName: F.envFileName,
       isOptional: true,
-      overrideWithFiles: ['.env'],
     );
   } catch (e) {
-    debugPrint('Note: Environment file not loaded, falling back to defaults: $e');
+    debugPrint('Note: Environment file (${F.envFileName}) not loaded, falling back to defaults: $e');
   }
 
   runApp(

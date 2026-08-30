@@ -45,7 +45,7 @@ Vector Search & Recall         │ Token Stream
 2. **Adaptive Bilingual Bridge**: Understands Indonesian and mixed Indonesian/English code-switching without mode toggling, guiding the learner back into English naturally.
 3. **Long-Term Vector Memory (Supabase pgvector)**: Asynchronous background worker extracts durable user facts, preferences, goals, and experiences, embeds them via `text-embedding-004` (768 dimensions), and recalls relevant memories into future conversations with HNSW cosine similarity search.
 4. **Sentence-by-Sentence Audio Streaming (Kyutai Pocket-TTS)**: Synthesizes clean spoken audio chunked at natural sentence boundaries with sub-1.5s first-sentence latency.
-5. **Interactive Flutter UI**: Built with Riverpod, `flutter_screenutil_plus`, audio queue with barge-in / interrupt support, and a slide-out Memory Drawer.
+5. **Interactive Flutter UI with Flavors**: Built with Riverpod, `flutter_screenutil_plus`, audio queue with barge-in / interrupt support, a slide-out Memory Drawer, and isolated flavors (`dev` & `prod`).
 
 ---
 
@@ -65,9 +65,12 @@ snape/
 │   └── tests/                # Pytest unit, integration, performance & E2E suite
 ├── snape_ui/                 # Frontend (Flutter, Riverpod)
 │   ├── lib/
-│   │   ├── core/             # Design tokens, theme, WebSocket client, audio queue
+│   │   ├── core/             # Design tokens, theme, WebSocket client, audio queue, config
 │   │   ├── data/             # Models and API repositories
-│   │   └── presentation/     # Screens, chat bubbles, audio status & memory drawer
+│   │   ├── presentation/     # Screens, chat bubbles, audio status & memory drawer
+│   │   ├── flavors.dart      # Flavor definitions (dev / prod)
+│   │   ├── main_dev.dart     # Dev entrypoint (loads .env.dev)
+│   │   └── main_prod.dart    # Prod entrypoint (loads .env.prod)
 │   └── test/                 # Flutter unit & widget tests
 └── scripts/                  # Development automation scripts
 ```
@@ -86,13 +89,11 @@ snape/
 ### 2. Backend Setup (`snape_be`)
 
 1. Copy `.env.example` to `.env` and fill in your Supabase DB URL and Gemini API Key:
-
    ```bash
    cp snape_be/.env.example snape_be/.env
    ```
 
 2. Apply database migrations to Supabase:
-
    ```bash
    # Option A: Run migration script
    python3 snape_be/scripts/apply_supabase_migration.py
@@ -102,26 +103,53 @@ snape/
    ```
 
 3. Start the development server:
-
    ```bash
    npm run dev
    # or
    ./scripts/dev_be.sh
    ```
-
    API Docs available at: `http://localhost:8000/api/v1/docs`
 
-### 3. Frontend Setup (`snape_ui`)
+---
+
+## Running & Building the Flutter App (`snape_ui`)
+
+### 1. Running the App (Development & Production)
 
 ```bash
-cd snape_ui
-flutter pub get
+# Development (loads .env.dev -> http://127.0.0.1:8000)
+npm run ui:dev
+# or: cd snape_ui && flutter run -t lib/main_dev.dart --flavor dev
 
-# Run Development Flavor
-flutter run -t lib/main_dev.dart --flavor dev
+# Production (loads .env.prod -> https://api.snape.app)
+npm run ui:prod
+# or: cd snape_ui && flutter run -t lib/main_prod.dart --flavor prod
+```
 
-# Run Production Flavor
-flutter run -t lib/main_prod.dart --flavor prod
+### 2. Building Android (APK & App Bundle)
+
+```bash
+# Build Development APK (debug/testing)
+npm run build:apk:dev
+# Output: snape_ui/build/app/outputs/flutter-apk/app-dev-release.apk
+
+# Build Production Release APK
+npm run build:apk:prod
+# Output: snape_ui/build/app/outputs/flutter-apk/app-prod-release.apk
+
+# Build Production Google Play App Bundle (AAB)
+npm run build:appbundle
+# Output: snape_ui/build/app/outputs/bundle/prodRelease/app-prod-release.aab
+```
+
+### 3. Building iOS
+
+```bash
+# Build Production iOS (no code-signing for CI/local inspection)
+npm run build:ios:prod
+
+# Build Production iOS IPA
+npm run build:ipa:prod
 ```
 
 ---
@@ -131,19 +159,14 @@ flutter run -t lib/main_prod.dart --flavor prod
 ### Backend Tests (Pytest, Ruff, Mypy)
 
 ```bash
-# Run test suite
-cd snape_be
-.venv/bin/pytest -v
-
-# Run linter and typecheck
-.venv/bin/ruff check .
-.venv/bin/mypy app tests
+npm run test     # cd snape_be && .venv/bin/pytest -v
+npm run lint     # cd snape_be && .venv/bin/ruff check . && .venv/bin/mypy app tests
+npm run format   # cd snape_be && .venv/bin/ruff format .
 ```
 
 ### Frontend Tests (Flutter)
 
 ```bash
-cd snape_ui
-flutter test
-flutter analyze
+npm run ui:test      # cd snape_ui && flutter test
+npm run ui:analyze   # cd snape_ui && flutter analyze
 ```

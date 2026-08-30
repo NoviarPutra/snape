@@ -7,6 +7,15 @@
     "test": "cd snape_be && .venv/bin/pytest -v",
     "lint": "cd snape_be && .venv/bin/ruff check . && .venv/bin/mypy app",
     "format": "cd snape_be && .venv/bin/ruff format . && .venv/bin/ruff check --fix .",
-    "migrate": "cd snape_be && .venv/bin/python scripts/apply_supabase_migration.py"
+    "migrate": "cd snape_be && .venv/bin/python scripts/apply_supabase_migration.py",
+    "ui:dev": "cd snape_ui && flutter run -t lib/main_dev.dart --flavor dev",
+    "ui:prod": "cd snape_ui && flutter run -t lib/main_prod.dart --flavor prod",
+    "ui:test": "cd snape_ui && flutter test",
+    "ui:analyze": "cd snape_ui && flutter analyze",
+    "build:apk:dev": "cd snape_ui && flutter build apk -t lib/main_dev.dart --flavor dev",
+    "build:apk:prod": "cd snape_ui && flutter build apk -t lib/main_prod.dart --flavor prod --release",
+    "build:appbundle": "cd snape_ui && flutter build appbundle -t lib/main_prod.dart --flavor prod --release",
+    "build:ios:prod": "cd snape_ui && flutter build ios -t lib/main_prod.dart --flavor prod --no-codesign",
+    "build:ipa:prod": "cd snape_ui && flutter build ipa -t lib/main_prod.dart --flavor prod"
   }
 }
