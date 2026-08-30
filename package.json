@@ -1,0 +1,12 @@
+{
+  "name": "snape",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "./scripts/dev_be.sh",
+    "test": "cd snape_be && .venv/bin/pytest -v",
+    "lint": "cd snape_be && .venv/bin/ruff check . && .venv/bin/mypy app",
+    "format": "cd snape_be && .venv/bin/ruff format . && .venv/bin/ruff check --fix .",
+    "migrate": "cd snape_be && .venv/bin/python scripts/apply_supabase_migration.py"
+  }
+}
