@@ -86,11 +86,13 @@ snape/
 ### 2. Backend Setup (`snape_be`)
 
 1. Copy `.env.example` to `.env` and fill in your Supabase DB URL and Gemini API Key:
+
    ```bash
    cp snape_be/.env.example snape_be/.env
    ```
 
 2. Apply database migrations to Supabase:
+
    ```bash
    # Option A: Run migration script
    python3 snape_be/scripts/apply_supabase_migration.py
@@ -100,11 +102,13 @@ snape/
    ```
 
 3. Start the development server:
+
    ```bash
    npm run dev
    # or
    ./scripts/dev_be.sh
    ```
+
    API Docs available at: `http://localhost:8000/api/v1/docs`
 
 ### 3. Frontend Setup (`snape_ui`)
