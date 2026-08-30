@@ -25,13 +25,13 @@ Snape is a private, single-user AI English companion designed for seamless conve
 Vector Search & Recall         │ Token Stream
             ▼                  ▼
 ┌─────────────────────────┐  ┌─────────────────────────┐
-│ Supabase Cloud Postgres │  │    Google Gemini API    │
-│ - pgvector (HNSW Index) │  │   (gemini-2.0-flash     │
-│ - Chat Sessions         │  │  + text-embedding-004)  │
-│ - Short-term Buffer (5) │  └─────────────────────────┘
-│ - Semantic User Memory  │                │
-└─────────────────────────┘                ▼
-                             ┌─────────────────────────┐
+│ Supabase Cloud Postgres │  │    OmniRoute AI Gateway │
+│ - pgvector (HNSW Index) │  │  - antigravity/gemini-  │
+│ - Chat Sessions         │  │    3.7-flash-high       │
+│ - Short-term Buffer (5) │  │  - OpenAI-compatible    │
+│ - Semantic User Memory  │  └─────────────────────────┘
+└─────────────────────────┘                │
+                             ┌─────────────┴───────────┐
                              │    Kyutai Pocket-TTS    │
                              │ - Sentence Audio Stream │
                              └─────────────────────────┘
@@ -43,7 +43,7 @@ Vector Search & Recall         │ Token Stream
 
 1. **Implicit Soft Correction**: Snape never interrupts or lectures on grammar rules. Slips in grammar, prepositions, or vocabulary are naturally mirrored with proper English phrasing.
 2. **Adaptive Bilingual Bridge**: Understands Indonesian and mixed Indonesian/English code-switching without mode toggling, guiding the learner back into English naturally.
-3. **Long-Term Vector Memory (Supabase pgvector)**: Asynchronous background worker extracts durable user facts, preferences, goals, and experiences, embeds them via `text-embedding-004` (768 dimensions), and recalls relevant memories into future conversations with HNSW cosine similarity search.
+3. **Long-Term Vector Memory (Supabase pgvector)**: Asynchronous background worker extracts durable user facts, preferences, goals, and experiences via OmniRoute AI Gateway, generates 768-dimensional normalized embeddings, and recalls relevant memories into future conversations with HNSW cosine similarity search.
 4. **Sentence-by-Sentence Audio Streaming (Kyutai Pocket-TTS)**: Synthesizes clean spoken audio chunked at natural sentence boundaries with sub-1.5s first-sentence latency.
 5. **Interactive Flutter UI with Flavors**: Built with Riverpod, `flutter_screenutil_plus`, audio queue with barge-in / interrupt support, a slide-out Memory Drawer, and isolated flavors (`dev` & `prod`).
 
@@ -84,16 +84,18 @@ snape/
 - Python 3.11+
 - Flutter SDK (3.24+)
 - Supabase Project (PostgreSQL with `pgvector` enabled)
-- Google Gemini API key
+- OmniRoute AI Gateway endpoint (default: `http://localhost:20128/v1` with model `antigravity/gemini-3.7-flash-high`)
 
 ### 2. Backend Setup (`snape_be`)
 
-1. Copy `.env.example` to `.env` and fill in your Supabase DB URL and Gemini API Key:
+1. Copy `.env.example` to `.env` and fill in your Supabase DB URL and OmniRoute credentials:
+
    ```bash
    cp snape_be/.env.example snape_be/.env
    ```
 
 2. Apply database migrations to Supabase:
+
    ```bash
    # Option A: Run migration script
    python3 snape_be/scripts/apply_supabase_migration.py
@@ -103,11 +105,13 @@ snape/
    ```
 
 3. Start the development server:
+
    ```bash
    npm run dev
    # or
    ./scripts/dev_be.sh
    ```
+
    API Docs available at: `http://localhost:8000/api/v1/docs`
 
 ---
