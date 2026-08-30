@@ -116,7 +116,12 @@ snape/
 ```bash
 cd snape_ui
 flutter pub get
-flutter run
+
+# Run Development Flavor
+flutter run -t lib/main_dev.dart --flavor dev
+
+# Run Production Flavor
+flutter run -t lib/main_prod.dart --flavor prod
 ```
 
 ---

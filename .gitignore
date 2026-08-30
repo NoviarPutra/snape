@@ -1,11 +1,20 @@
 # Environment variables
 .env
+.env.*
 .env.local
 .env.*.local
+!.env.example
+!.env.*.example
 snape_be/.env
+snape_be/.env.*
 snape_be/.env.*.local
+!snape_be/.env.example
+!snape_be/.env.*.example
 snape_ui/.env
+snape_ui/.env.*
 snape_ui/.env.*.local
+!snape_ui/.env.example
+!snape_ui/.env.*.example
 
 # Python
 __pycache__/

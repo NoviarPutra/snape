@@ -3,16 +3,22 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'core/theme/app_theme.dart';
+import 'flavors.dart';
 import 'presentation/screens/chat_screen.dart';
 
-Future<void> main() async {
+Future<void> runSnapeApp(Flavor flavor) async {
   WidgetsFlutterBinding.ensureInitialized();
+  F.appFlavor = flavor;
 
-  // Load environment configuration gracefully
+  // Try loading flavor-specific .env first, then fallback to .env
   try {
-    await dotenv.load(fileName: '.env');
+    await dotenv.load(
+      fileName: F.envFileName,
+      isOptional: true,
+      overrideWithFiles: ['.env'],
+    );
   } catch (e) {
-    debugPrint('Note: .env file not found or failed to load, using default config: $e');
+    debugPrint('Note: Environment file not loaded, falling back to defaults: $e');
   }
 
   runApp(
@@ -33,7 +39,7 @@ class SnapeApp extends StatelessWidget {
       splitScreenMode: true,
       builder: (context, child) {
         return MaterialApp(
-          title: 'Snape AI Companion',
+          title: F.title,
           debugShowCheckedModeBanner: false,
           theme: AppTheme.lightTheme,
           home: child,
