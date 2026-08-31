@@ -16,13 +16,15 @@ abstract class BaseSpeechService {
 class SpeechService implements BaseSpeechService {
   final stt.SpeechToText _speech = stt.SpeechToText();
   bool _isAvailable = false;
+  bool _isListening = false;
+  bool _isStarting = false;
   Function(bool isListening)? _onListeningStateChanged;
 
   @override
   bool get isAvailable => _isAvailable;
 
   @override
-  bool get isListening => _speech.isListening;
+  bool get isListening => _isListening || _speech.isListening || _isStarting;
 
   @override
   Future<bool> initialize() async {
@@ -30,14 +32,23 @@ class SpeechService implements BaseSpeechService {
       _isAvailable = await _speech.initialize(
         onError: (error) {
           debugPrint('SpeechToText error: $error');
-          _onListeningStateChanged?.call(false);
+          if (_isListening) {
+            _isListening = false;
+            _onListeningStateChanged?.call(false);
+          }
         },
         onStatus: (status) {
           debugPrint('SpeechToText status: $status');
           if (status == 'notListening' || status == 'done') {
-            _onListeningStateChanged?.call(false);
+            if (_isListening) {
+              _isListening = false;
+              _onListeningStateChanged?.call(false);
+            }
           } else if (status == 'listening') {
-            _onListeningStateChanged?.call(true);
+            if (!_isListening) {
+              _isListening = true;
+              _onListeningStateChanged?.call(true);
+            }
           }
         },
       );
@@ -45,6 +56,7 @@ class SpeechService implements BaseSpeechService {
     } catch (e) {
       debugPrint('SpeechToText initialization failed: $e');
       _isAvailable = false;
+      _isListening = false;
       return false;
     }
   }
@@ -54,29 +66,38 @@ class SpeechService implements BaseSpeechService {
     required Function(String text, bool isFinal) onResult,
     Function(bool isListening)? onListeningStateChanged,
     String localeId = 'en_US',
+    stt.ListenMode listenMode = stt.ListenMode.dictation,
+    Duration pauseFor = const Duration(seconds: 4),
   }) async {
     _onListeningStateChanged = onListeningStateChanged;
+
+    if (_isStarting || _speech.isListening) {
+      return;
+    }
 
     if (!_isAvailable) {
       final initialized = await initialize();
       if (!initialized) {
+        _isListening = false;
         onListeningStateChanged?.call(false);
         return;
       }
     }
 
-    if (_speech.isListening) {
-      return;
-    }
-
+    _isStarting = true;
     try {
+      if (_speech.isListening) {
+        await _speech.stop();
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      }
+
       await _speech.listen(
         onResult: (result) {
           onResult(result.recognizedWords, result.finalResult);
         },
         listenOptions: stt.SpeechListenOptions(
-          listenMode: stt.ListenMode.confirmation,
-          pauseFor: const Duration(seconds: 3),
+          listenMode: listenMode,
+          pauseFor: pauseFor,
           localeId: localeId,
           cancelOnError: false,
           partialResults: true,
@@ -84,18 +105,27 @@ class SpeechService implements BaseSpeechService {
       );
     } catch (e) {
       debugPrint('Speech listening error: $e');
+      _isListening = false;
       onListeningStateChanged?.call(false);
+    } finally {
+      _isStarting = false;
     }
   }
 
   @override
   Future<void> stopListening() async {
     try {
+      _isStarting = false;
       if (_speech.isListening) {
         await _speech.stop();
       }
+      if (_isListening) {
+        _isListening = false;
+        _onListeningStateChanged?.call(false);
+      }
     } catch (e) {
       debugPrint('Speech stop error: $e');
+      _isListening = false;
     }
   }
 }
