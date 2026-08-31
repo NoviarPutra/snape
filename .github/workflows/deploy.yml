@@ -61,6 +61,7 @@ jobs:
             echo "🚀 Deploying Snape Backend to VPS at $PROJECT_DIR..."
 
             cd "$PROJECT_DIR"
+            git remote set-url origin "https://github.com/${{ github.repository }}.git"
             git fetch origin master
             git reset --hard origin/master
 
