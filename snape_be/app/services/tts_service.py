@@ -57,6 +57,10 @@ class BaseTTSProvider(ABC):
     def sample_rate(self) -> int:
         return 24000
 
+    @property
+    def audio_format(self) -> str:
+        return "wav"
+
     @abstractmethod
     def synthesize_sync(self, text: str) -> bytes:
         """Synchronously synthesizes text into WAV audio bytes."""
@@ -100,6 +104,10 @@ class EdgeTTSProvider(BaseTTSProvider):
     @property
     def sample_rate(self) -> int:
         return self._sample_rate
+
+    @property
+    def audio_format(self) -> str:
+        return "mp3"
 
     def synthesize_sync(self, text: str) -> bytes:
         return generate_mock_wav(text=text, sample_rate=self._sample_rate)

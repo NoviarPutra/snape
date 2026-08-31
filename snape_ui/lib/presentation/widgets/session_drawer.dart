@@ -76,41 +76,44 @@ class SessionDrawer extends StatelessWidget {
 
                         return Container(
                           margin: EdgeInsets.only(bottom: AppSpacing.xs.h),
-                          decoration: BoxDecoration(
+                          child: Material(
                             color: isSelected ? AppColors.indigoSoftBackground : AppColors.surfaceCard,
-                            borderRadius: BorderRadius.circular(AppRadii.md.r),
-                            border: Border.all(
-                              color: isSelected ? AppColors.indigoAccentLight : AppColors.dividerColor,
-                              width: 1,
-                            ),
-                          ),
-                          child: ListTile(
-                            dense: true,
-                            title: Text(
-                              session.title,
-                              style: AppTypography.bodyLarge.copyWith(
-                                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                                color: isSelected ? AppColors.indigoAccent : AppColors.slatePrimary,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(AppRadii.md.r),
+                              side: BorderSide(
+                                color: isSelected ? AppColors.indigoAccentLight : AppColors.dividerColor,
+                                width: 1,
                               ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
                             ),
-                            subtitle: Text(
-                              dateStr,
-                              style: AppTypography.caption,
-                            ),
-                            trailing: IconButton(
-                              icon: Icon(
-                                Icons.delete_outline_rounded,
-                                size: 18.r,
-                                color: AppColors.slateTertiary,
+                            clipBehavior: Clip.antiAlias,
+                            child: ListTile(
+                              dense: true,
+                              title: Text(
+                                session.title,
+                                style: AppTypography.bodyLarge.copyWith(
+                                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                                  color: isSelected ? AppColors.indigoAccent : AppColors.slatePrimary,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
-                              onPressed: () => onDeleteSession(session.id),
+                              subtitle: Text(
+                                dateStr,
+                                style: AppTypography.caption,
+                              ),
+                              trailing: IconButton(
+                                icon: Icon(
+                                  Icons.delete_outline_rounded,
+                                  size: 18.r,
+                                  color: AppColors.slateTertiary,
+                                ),
+                                onPressed: () => onDeleteSession(session.id),
+                              ),
+                              onTap: () {
+                                Navigator.pop(context);
+                                onSelectSession(session);
+                              },
                             ),
-                            onTap: () {
-                              Navigator.pop(context);
-                              onSelectSession(session);
-                            },
                           ),
                         );
                       },

@@ -253,5 +253,30 @@ void main() {
       expect(notifier.state.isStreaming, isFalse);
       expect(notifier.state.lastExtractedMemories, ['User is friendly and studying IELTS']);
     });
+
+    test('sendMessage sanitizes prior streaming message so bubble is not stuck loading', () async {
+      await notifier.switchSession('sess-1');
+      await notifier.sendMessage('First turn');
+
+      expect(notifier.state.messages[1].isStreaming, isTrue);
+
+      // Send second message before first is resolved
+      await notifier.sendMessage('Second turn');
+
+      expect(notifier.state.messages[1].isStreaming, isFalse);
+      expect(notifier.state.messages[1].content, 'Message interrupted');
+      expect(notifier.state.messages[3].isStreaming, isTrue);
+    });
+
+    test('sendMessage drops identical duplicate message when streaming is active', () async {
+      await notifier.switchSession('sess-1');
+      await notifier.sendMessage('Duplicate prompt');
+
+      expect(repository.sentMessages.length, 1);
+
+      // Send duplicate
+      await notifier.sendMessage('Duplicate prompt');
+      expect(repository.sentMessages.length, 1);
+    });
   });
 }

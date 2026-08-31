@@ -14,14 +14,20 @@ class VoiceCallNotifier extends StateNotifier<VoiceCallState> {
   final Duration silenceDuration;
 
   Timer? _silenceTimer;
+  Timer? _restartTimer;
+  Timer? _audioDoneDebounceTimer;
   StreamSubscription<bool>? _isSpeakingSubscription;
   VoidCallback? _chatRemoveListener;
+
+  bool _isDispatching = false;
+  String _lastDispatchedText = '';
+  DateTime? _lastDispatchTime;
 
   VoiceCallNotifier({
     required this.chatNotifier,
     required this.speechService,
     this.audioQueueService,
-    this.silenceDuration = const Duration(milliseconds: 1800),
+    this.silenceDuration = const Duration(milliseconds: 2200),
   }) : super(const VoiceCallState()) {
     _initSubscriptions();
   }
@@ -30,15 +36,29 @@ class VoiceCallNotifier extends StateNotifier<VoiceCallState> {
     _isSpeakingSubscription =
         audioQueueService?.isSpeakingStream.listen((isSpeaking) {
       if (isSpeaking) {
+        _audioDoneDebounceTimer?.cancel();
+        _silenceTimer?.cancel();
+        _restartTimer?.cancel();
+        speechService.stopListening();
         if (state.phase != VoiceCallPhase.idle) {
           state = state.copyWith(phase: VoiceCallPhase.speaking);
         }
       } else {
-        // When AI stops speaking and we are in an active call, return to listening
+        // When AI stops speaking and we are in an active call, return to listening after acoustic delay
         if (state.phase == VoiceCallPhase.speaking ||
-            state.phase == VoiceCallPhase.greeting) {
+            state.phase == VoiceCallPhase.greeting ||
+            state.phase == VoiceCallPhase.thinking) {
           if (!state.isMuted && state.phase != VoiceCallPhase.idle) {
-            _startListeningLoop();
+            _audioDoneDebounceTimer?.cancel();
+            _audioDoneDebounceTimer =
+                Timer(const Duration(milliseconds: 250), () {
+              if (mounted &&
+                  !state.isMuted &&
+                  state.phase != VoiceCallPhase.idle &&
+                  !(audioQueueService?.isSpeaking ?? false)) {
+                _startListeningLoop();
+              }
+            });
           }
         }
       }
@@ -50,6 +70,18 @@ class VoiceCallNotifier extends StateNotifier<VoiceCallState> {
   void _handleChatStateChange(ChatState chatState) {
     if (state.phase == VoiceCallPhase.idle) return;
 
+    if (chatState.errorMessage != null && chatState.errorMessage!.isNotEmpty) {
+      _isDispatching = false;
+      state = state.copyWith(
+        errorMessage: chatState.errorMessage,
+        phase: VoiceCallPhase.listening,
+      );
+      if (!state.isMuted) {
+        _startListeningLoop();
+      }
+      return;
+    }
+
     if (chatState.isStreaming && chatState.currentStreamingId.isNotEmpty) {
       final streamingMsg = chatState.messages
           .where((m) => m.id == chatState.currentStreamingId)
@@ -58,6 +90,15 @@ class VoiceCallNotifier extends StateNotifier<VoiceCallState> {
         state = state.copyWith(
           assistantSpeech: streamingMsg.content,
         );
+      }
+    } else if (!chatState.isStreaming && state.phase == VoiceCallPhase.thinking) {
+      final hasAudioQueuedOrPlaying =
+          (audioQueueService?.isPlaying ?? false) ||
+          (audioQueueService?.queueLength ?? 0) > 0 ||
+          (audioQueueService?.isSpeaking ?? false);
+      if (!hasAudioQueuedOrPlaying && !state.isMuted) {
+        _isDispatching = false;
+        _startListeningLoop();
       }
     }
   }
@@ -95,9 +136,13 @@ class VoiceCallNotifier extends StateNotifier<VoiceCallState> {
   }
 
   Future<void> _startListeningLoop({bool keepPhase = false}) async {
-    if (state.isMuted || state.phase == VoiceCallPhase.idle) return;
+    if (!mounted || state.isMuted || state.phase == VoiceCallPhase.idle) return;
+    if (audioQueueService?.isSpeaking ?? false) return;
 
     _silenceTimer?.cancel();
+    _restartTimer?.cancel();
+    _isDispatching = false;
+
     if (!keepPhase) {
       state = state.copyWith(
         phase: VoiceCallPhase.listening,
@@ -112,11 +157,30 @@ class VoiceCallNotifier extends StateNotifier<VoiceCallState> {
         _handleSpeechResult(text, isFinal);
       },
       onListeningStateChanged: (isListening) {
-        if (!isListening &&
-            (state.phase == VoiceCallPhase.listening ||
-                state.phase == VoiceCallPhase.greeting) &&
-            state.userSpeech.trim().isNotEmpty) {
-          _dispatchUserTurn();
+        if (!isListening && mounted) {
+          if (state.phase == VoiceCallPhase.listening ||
+              state.phase == VoiceCallPhase.greeting) {
+            if (!_isDispatching && state.userSpeech.trim().isNotEmpty) {
+              _dispatchUserTurn();
+            } else if (!state.isMuted &&
+                !_isDispatching &&
+                state.phase != VoiceCallPhase.idle &&
+                state.phase != VoiceCallPhase.thinking &&
+                state.phase != VoiceCallPhase.speaking &&
+                !(audioQueueService?.isSpeaking ?? false)) {
+              _restartTimer?.cancel();
+              _restartTimer = Timer(const Duration(milliseconds: 200), () {
+                if (mounted &&
+                    !state.isMuted &&
+                    !_isDispatching &&
+                    !(audioQueueService?.isSpeaking ?? false) &&
+                    (state.phase == VoiceCallPhase.listening ||
+                        state.phase == VoiceCallPhase.greeting)) {
+                  _startListeningLoop(keepPhase: true);
+                }
+              });
+            }
+          }
         }
       },
     );
@@ -125,11 +189,16 @@ class VoiceCallNotifier extends StateNotifier<VoiceCallState> {
   void _handleSpeechResult(String text, bool isFinal) {
     final trimmed = text.trim();
     if (trimmed.isEmpty) return;
+    if (_isDispatching || state.phase == VoiceCallPhase.thinking) return;
 
-    // Barge-in: If user speaks while AI is speaking or in greeting, interrupt immediately
+    // Barge-in: If user speaks while AI is speaking or in greeting, interrupt audio immediately
     if (state.phase == VoiceCallPhase.speaking ||
         state.phase == VoiceCallPhase.greeting) {
-      bargeIn();
+      audioQueueService?.stopAndClear();
+      state = state.copyWith(
+        phase: VoiceCallPhase.listening,
+        assistantSpeech: '',
+      );
     }
 
     state = state.copyWith(
@@ -143,7 +212,8 @@ class VoiceCallNotifier extends StateNotifier<VoiceCallState> {
     } else {
       // Reset silence debounce timer
       _silenceTimer = Timer(silenceDuration, () {
-        if (state.phase == VoiceCallPhase.listening &&
+        if (!_isDispatching &&
+            state.phase == VoiceCallPhase.listening &&
             state.userSpeech.trim().isNotEmpty) {
           _dispatchUserTurn();
         }
@@ -153,12 +223,39 @@ class VoiceCallNotifier extends StateNotifier<VoiceCallState> {
 
   void _dispatchUserTurn() {
     _silenceTimer?.cancel();
+    _restartTimer?.cancel();
+    if (_isDispatching) return;
+
     final textToSend = state.userSpeech.trim();
     if (textToSend.isEmpty || state.phase == VoiceCallPhase.thinking) return;
+
+    final now = DateTime.now();
+    if (_lastDispatchedText == textToSend &&
+        _lastDispatchTime != null &&
+        now.difference(_lastDispatchTime!).inMilliseconds < 1500) {
+      return;
+    }
+
+    _isDispatching = true;
+    _lastDispatchedText = textToSend;
+    _lastDispatchTime = now;
+
+    if (chatNotifier.state.sessionId == null) {
+      _isDispatching = false;
+      state = state.copyWith(
+        errorMessage: 'No active session found. Please reconnect or open a session.',
+        phase: VoiceCallPhase.listening,
+      );
+      if (!state.isMuted) {
+        _startListeningLoop();
+      }
+      return;
+    }
 
     state = state.copyWith(
       phase: VoiceCallPhase.thinking,
       assistantSpeech: '',
+      userSpeech: textToSend,
     );
     speechService.stopListening();
 
@@ -172,7 +269,9 @@ class VoiceCallNotifier extends StateNotifier<VoiceCallState> {
       phase: VoiceCallPhase.listening,
       assistantSpeech: '',
     );
-    _startListeningLoop();
+    if (!speechService.isListening && !state.isMuted && state.phase != VoiceCallPhase.idle) {
+      _startListeningLoop();
+    }
   }
 
   Future<void> toggleLanguage() async {
@@ -207,6 +306,9 @@ class VoiceCallNotifier extends StateNotifier<VoiceCallState> {
 
   Future<void> endCall() async {
     _silenceTimer?.cancel();
+    _restartTimer?.cancel();
+    _audioDoneDebounceTimer?.cancel();
+    _isDispatching = false;
     await speechService.stopListening();
     audioQueueService?.stopAndClear();
 
@@ -220,6 +322,9 @@ class VoiceCallNotifier extends StateNotifier<VoiceCallState> {
   @override
   void dispose() {
     _silenceTimer?.cancel();
+    _restartTimer?.cancel();
+    _audioDoneDebounceTimer?.cancel();
+    _isDispatching = false;
     _isSpeakingSubscription?.cancel();
     _chatRemoveListener?.call();
     speechService.stopListening();

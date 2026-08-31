@@ -140,8 +140,27 @@ class ChatNotifier extends StateNotifier<ChatState> {
     final trimmed = text.trim();
     if (trimmed.isEmpty || state.sessionId == null) return;
 
+    // Deduplicate: ignore identical message if currently streaming the same input
+    if (state.isStreaming &&
+        state.messages.isNotEmpty &&
+        state.messages.any((m) => m.isUser && m.content == trimmed)) {
+      return;
+    }
+
     // Barge-in: halt ongoing companion audio playback and clear queued audio buffers
     _audioQueueService?.stopAndClear();
+
+    // Sanitize any previous unresolved streaming placeholders to prevent stuck loading bubbles
+    final sanitizedMessages = state.messages.map((m) {
+      if (m.isStreaming) {
+        return m.copyWith(
+          isStreaming: false,
+          status: m.content.isEmpty ? MessageStatus.error : MessageStatus.delivered,
+          content: m.content.isEmpty ? 'Message interrupted' : m.content,
+        );
+      }
+      return m;
+    }).toList();
 
     final userMessageId = _uuid.v4();
     final userMessage = ChatMessage(
@@ -165,7 +184,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
     );
 
     final updatedMessages = [
-      ...state.messages,
+      ...sanitizedMessages,
       userMessage,
       assistantPlaceholder,
     ];

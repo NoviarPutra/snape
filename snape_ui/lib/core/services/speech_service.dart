@@ -16,6 +16,7 @@ abstract class BaseSpeechService {
 class SpeechService implements BaseSpeechService {
   final stt.SpeechToText _speech = stt.SpeechToText();
   bool _isAvailable = false;
+  Function(bool isListening)? _onListeningStateChanged;
 
   @override
   bool get isAvailable => _isAvailable;
@@ -27,8 +28,18 @@ class SpeechService implements BaseSpeechService {
   Future<bool> initialize() async {
     try {
       _isAvailable = await _speech.initialize(
-        onError: (error) => debugPrint('SpeechToText error: $error'),
-        onStatus: (status) => debugPrint('SpeechToText status: $status'),
+        onError: (error) {
+          debugPrint('SpeechToText error: $error');
+          _onListeningStateChanged?.call(false);
+        },
+        onStatus: (status) {
+          debugPrint('SpeechToText status: $status');
+          if (status == 'notListening' || status == 'done') {
+            _onListeningStateChanged?.call(false);
+          } else if (status == 'listening') {
+            _onListeningStateChanged?.call(true);
+          }
+        },
       );
       return _isAvailable;
     } catch (e) {
@@ -44,25 +55,31 @@ class SpeechService implements BaseSpeechService {
     Function(bool isListening)? onListeningStateChanged,
     String localeId = 'en_US',
   }) async {
+    _onListeningStateChanged = onListeningStateChanged;
+
     if (!_isAvailable) {
       final initialized = await initialize();
-      if (!initialized) return;
+      if (!initialized) {
+        onListeningStateChanged?.call(false);
+        return;
+      }
     }
 
-    onListeningStateChanged?.call(true);
+    if (_speech.isListening) {
+      return;
+    }
 
     try {
       await _speech.listen(
         onResult: (result) {
           onResult(result.recognizedWords, result.finalResult);
-          if (result.finalResult) {
-            onListeningStateChanged?.call(false);
-          }
         },
         listenOptions: stt.SpeechListenOptions(
-          listenMode: stt.ListenMode.dictation,
+          listenMode: stt.ListenMode.confirmation,
           pauseFor: const Duration(seconds: 3),
           localeId: localeId,
+          cancelOnError: false,
+          partialResults: true,
         ),
       );
     } catch (e) {
@@ -74,7 +91,9 @@ class SpeechService implements BaseSpeechService {
   @override
   Future<void> stopListening() async {
     try {
-      await _speech.stop();
+      if (_speech.isListening) {
+        await _speech.stop();
+      }
     } catch (e) {
       debugPrint('Speech stop error: $e');
     }

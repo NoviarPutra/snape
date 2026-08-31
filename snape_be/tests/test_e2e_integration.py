@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
+from app.api.v1.chat_ws import get_chat_pipeline
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import create_app
@@ -63,6 +64,11 @@ def ws_app(db_session: AsyncSession) -> TestClient:
         yield db_session
 
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_chat_pipeline] = lambda: ChatPipeline(
+        llm_service=MockLLMService(
+            canned_tokens=["You ", "went ", "to ", "the ", "market?"]
+        )
+    )
     return TestClient(app)
 
 

@@ -27,15 +27,20 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["WebSocket"])
 
 
+def get_chat_pipeline() -> ChatPipeline:
+    """Dependency provider returning ChatPipeline instance."""
+    return ChatPipeline()
+
+
 @router.websocket("/ws/chat/{session_id}")
 async def chat_websocket_endpoint(
     websocket: WebSocket,
     session_id: UUID,
     db: AsyncSession = Depends(get_db),
+    pipeline: ChatPipeline = Depends(get_chat_pipeline),
 ) -> None:
     """WebSocket endpoint handling real-time bi-directional chat streaming."""
     await websocket.accept()
-    pipeline = ChatPipeline()
 
     try:
         while True:

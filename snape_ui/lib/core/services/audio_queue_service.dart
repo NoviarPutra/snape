@@ -15,7 +15,34 @@ class DefaultAudioPlayerAdapter implements AudioPlayerAdapter {
   final AudioPlayer _player;
 
   DefaultAudioPlayerAdapter({AudioPlayer? player})
-      : _player = player ?? AudioPlayer();
+      : _player = player ?? AudioPlayer() {
+    _initAudioContext();
+  }
+
+  Future<void> _initAudioContext() async {
+    try {
+      await _player.setAudioContext(
+        AudioContext(
+          android: const AudioContextAndroid(
+            isSpeakerphoneOn: true,
+            stayAwake: true,
+            contentType: AndroidContentType.speech,
+            usageType: AndroidUsageType.media,
+            audioFocus: AndroidAudioFocus.gainTransientMayDuck,
+          ),
+          iOS: AudioContextIOS(
+            category: AVAudioSessionCategory.playAndRecord,
+            options: {
+              AVAudioSessionOptions.defaultToSpeaker,
+              AVAudioSessionOptions.allowBluetooth,
+            },
+          ),
+        ),
+      );
+    } catch (e) {
+      debugPrint('AudioContext init error: $e');
+    }
+  }
 
   @override
   Stream<void> get onPlayerComplete => _player.onPlayerComplete;

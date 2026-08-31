@@ -4,7 +4,9 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_radii.dart';
 import '../../core/theme/app_spacing.dart';
+import '../state/chat_notifier.dart';
 import '../state/providers.dart';
+import '../state/session_notifier.dart';
 import '../state/voice_call_state.dart';
 import '../widgets/voice_call_header.dart';
 import '../widgets/voice_control_bar.dart';
@@ -49,8 +51,23 @@ class _VoiceCallScreenState extends ConsumerState<VoiceCallScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(voiceCallProvider.notifier).startCall(withGreeting: true);
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final chatState = ref.read(chatProvider);
+      if (chatState.sessionId == null) {
+        final sessionNotifier = ref.read(sessionProvider.notifier);
+        await sessionNotifier.loadSessions();
+        final sessionState = ref.read(sessionProvider);
+        if (sessionState.sessions.isEmpty) {
+          await sessionNotifier.createSession(title: 'Casual English Practice');
+        }
+        final currentSession = ref.read(sessionProvider).currentSession;
+        if (currentSession != null) {
+          await ref.read(chatProvider.notifier).switchSession(currentSession.id);
+        }
+      }
+      if (mounted) {
+        ref.read(voiceCallProvider.notifier).startCall(withGreeting: true);
+      }
     });
   }
 

@@ -125,37 +125,39 @@ class MemoryDrawer extends ConsumerWidget {
                           memoryState.selectedCategory!.isEmpty)
                       : (memoryState.selectedCategory?.toUpperCase() == cat);
 
-                  return InkWell(
-                    borderRadius: BorderRadius.circular(AppRadii.xs.r),
-                    onTap: () {
-                      memoryNotifier.selectCategory(isAll ? null : cat.toLowerCase());
-                    },
-                    child: Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: AppSpacing.sm.w,
-                        vertical: 4.h,
-                      ),
-                      decoration: BoxDecoration(
+                  return Material(
+                    color: isSelected
+                        ? AppColors.indigoAccent
+                        : AppColors.surfaceWarm,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppRadii.xs.r),
+                      side: BorderSide(
                         color: isSelected
                             ? AppColors.indigoAccent
-                            : AppColors.surfaceWarm,
-                        borderRadius: BorderRadius.circular(AppRadii.xs.r),
-                        border: Border.all(
-                          color: isSelected
-                              ? AppColors.indigoAccent
-                              : AppColors.dividerColor,
-                          width: 1,
-                        ),
+                            : AppColors.dividerColor,
+                        width: 1,
                       ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        cat,
-                        style: TextStyle(
-                          fontSize: 11.sp,
-                          fontWeight: FontWeight.w600,
-                          color: isSelected
-                              ? Colors.white
-                              : AppColors.slateSecondary,
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: InkWell(
+                      onTap: () {
+                        memoryNotifier.selectCategory(isAll ? null : cat.toLowerCase());
+                      },
+                      child: Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: AppSpacing.sm.w,
+                          vertical: 4.h,
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          cat,
+                          style: TextStyle(
+                            fontSize: 11.sp,
+                            fontWeight: FontWeight.w600,
+                            color: isSelected
+                                ? Colors.white
+                                : AppColors.slateSecondary,
+                          ),
                         ),
                       ),
                     ),

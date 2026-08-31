@@ -140,7 +140,7 @@ class ChatPipeline:
                                 yield StreamAudioEvent(
                                     sentence=clean_text,
                                     audio_base64=audio_base64,
-                                    format="wav",
+                                    format=self.tts_provider.audio_format,
                                     sample_rate=self.tts_provider.sample_rate,
                                 )
                         except Exception as exc:

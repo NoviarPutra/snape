@@ -245,6 +245,24 @@ void main() {
       expect(mockChatRepo.sentMessages, contains('I want to practice English'));
     });
 
+    test('auto-restarts listening when speech recognizer stops with no recognized words', () async {
+      await voiceNotifier.startCall(withGreeting: false);
+      expect(voiceNotifier.state.phase, VoiceCallPhase.listening);
+      expect(mockSpeechService.isListening, isTrue);
+
+      // Simulate recognizer stopping due to timeout / error_no_match with no recognized words
+      mockSpeechService.onListeningStateChanged?.call(false);
+
+      expect(voiceNotifier.state.userSpeech, isEmpty);
+      expect(voiceNotifier.state.phase, VoiceCallPhase.listening);
+
+      // Wait for auto-restart timer (150ms) + buffer
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+
+      expect(mockSpeechService.isListening, isTrue);
+      expect(voiceNotifier.state.phase, VoiceCallPhase.listening);
+    });
+
     test('transitions to speaking when companion audio arrives, then returns to listening when playback completes', () async {
       await voiceNotifier.startCall(withGreeting: false);
 
@@ -265,10 +283,38 @@ void main() {
 
       // Complete playback
       mockPlayerAdapter.completeCurrentPlayback();
-      await Future<void>.delayed(const Duration(milliseconds: 10));
+      await Future<void>.delayed(const Duration(milliseconds: 300));
 
       expect(voiceNotifier.state.phase, VoiceCallPhase.listening);
       expect(mockSpeechService.isListening, isTrue);
+    });
+
+    test('stops listening while assistant is speaking to prevent speaker feedback echo', () async {
+      await voiceNotifier.startCall(withGreeting: false);
+      expect(mockSpeechService.isListening, isTrue);
+
+      // Assistant starts speaking
+      mockChatRepo.emitEvent(const WSAudioEvent(sentence: 'Hello', audioBase64: 'AQIDBA=='));
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      expect(voiceNotifier.state.phase, VoiceCallPhase.speaking);
+      expect(mockSpeechService.isListening, isFalse);
+    });
+
+    test('rejects rapid duplicate speech dispatches within debounce window', () async {
+      await voiceNotifier.startCall(withGreeting: false);
+
+      mockSpeechService.emitSpeech('Repeat text', isFinal: true);
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      expect(mockChatRepo.sentMessages.length, 1);
+      expect(mockChatRepo.sentMessages.first, 'Repeat text');
+
+      // Attempt immediate duplicate
+      mockSpeechService.emitSpeech('Repeat text', isFinal: true);
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      expect(mockChatRepo.sentMessages.length, 1);
     });
 
     test('instant barge-in cuts off assistant speech when user speaks during speaking phase', () async {

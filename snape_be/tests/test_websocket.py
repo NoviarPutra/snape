@@ -6,11 +6,14 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.v1.chat_ws import get_chat_pipeline
 from app.core.config import settings
 from app.db.session import get_db
 from app.main import create_app
 from app.schemas.session import SessionCreate
 from app.services import session_service, user_service
+from app.services.chat_pipeline import ChatPipeline
+from app.services.llm_service import MockLLMService
 
 
 @pytest.fixture
@@ -22,6 +25,9 @@ def ws_app(db_session: AsyncSession) -> TestClient:
         yield db_session
 
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_chat_pipeline] = lambda: ChatPipeline(
+        llm_service=MockLLMService()
+    )
     return TestClient(app)
 
 
