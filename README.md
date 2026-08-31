@@ -44,8 +44,9 @@ Vector Search & Recall         │ Token Stream
 1. **Implicit Soft Correction**: Snape never interrupts or lectures on grammar rules. Slips in grammar, prepositions, or vocabulary are naturally mirrored with proper English phrasing.
 2. **Adaptive Bilingual Bridge**: Understands Indonesian and mixed Indonesian/English code-switching without mode toggling, guiding the learner back into English naturally.
 3. **Long-Term Vector Memory (Supabase pgvector)**: Asynchronous background worker extracts durable user facts, preferences, goals, and experiences via OmniRoute AI Gateway, generates 768-dimensional normalized embeddings, and recalls relevant memories into future conversations with HNSW cosine similarity search.
-4. **Sentence-by-Sentence Audio Streaming (Kyutai Pocket-TTS)**: Synthesizes clean spoken audio chunked at natural sentence boundaries with sub-1.5s first-sentence latency.
-5. **Interactive Flutter UI with Flavors**: Built with Riverpod, `flutter_screenutil_plus`, audio queue with barge-in / interrupt support, a slide-out Memory Drawer, and isolated flavors (`dev` & `prod`).
+4. **Sentence-by-Sentence Audio Streaming (Kyutai Pocket-TTS / Edge-TTS)**: Synthesizes clean spoken audio chunked at natural sentence boundaries with sub-1.5s first-sentence latency.
+5. **Real-Time Interactive Voice Call**: Hands-free fullscreen voice conversation experience with turn-taking state machine, audio wave visualizers, mic mute/unmute, and instant barge-in support.
+6. **Interactive Flutter UI with Flavors**: Built with Riverpod, `flutter_screenutil_plus`, audio queue with barge-in / interrupt support, a slide-out Memory Drawer, and isolated flavors (`dev` & `prod`).
 
 ---
 
@@ -53,6 +54,9 @@ Vector Search & Recall         │ Token Stream
 
 ```text
 snape/
+├── .github/
+│   └── workflows/
+│       └── deploy.yml        # CI/CD pipeline (Lint, Typecheck, Tests, VPS Deploy)
 ├── snape_be/                 # Backend (FastAPI, SQLAlchemy 2.0 Async, pgvector)
 │   ├── app/
 │   │   ├── api/v1/           # REST endpoints (health, user, sessions, memories) & WebSocket
@@ -60,6 +64,7 @@ snape/
 │   │   ├── db/               # Database session, base model, pgvector schema
 │   │   ├── schemas/          # Pydantic v2 schemas and DTOs
 │   │   └── services/         # LLM, Memory, Embedding, TTS, and Chat Pipeline
+│   ├── ecosystem.config.cjs  # PM2 production process configuration
 │   ├── scripts/              # Migration runners
 │   ├── supabase/migrations/  # SQL migration files (pgvector + HNSW index)
 │   └── tests/                # Pytest unit, integration, performance & E2E suite
@@ -68,6 +73,7 @@ snape/
 │   │   ├── core/             # Design tokens, theme, WebSocket client, audio queue, config
 │   │   ├── data/             # Models and API repositories
 │   │   ├── presentation/     # Screens, chat bubbles, audio status & memory drawer
+│   │   │   └── voice_call/   # Fullscreen voice call screen and turn-taking loop
 │   │   ├── flavors.dart      # Flavor definitions (dev / prod)
 │   │   ├── main_dev.dart     # Dev entrypoint (loads .env.dev)
 │   │   └── main_prod.dart    # Prod entrypoint (loads .env.prod)
@@ -125,7 +131,7 @@ snape/
 npm run ui:dev
 # or: cd snape_ui && flutter run -t lib/main_dev.dart --flavor dev
 
-# Production (loads .env.prod -> https://api.snape.app)
+# Production (loads .env.prod -> https://api.103-174-114-224.nip.io)
 npm run ui:prod
 # or: cd snape_ui && flutter run -t lib/main_prod.dart --flavor prod
 ```
@@ -180,6 +186,7 @@ npm run ui:analyze   # cd snape_ui && flutter analyze
 ## CI/CD Pipeline (GitHub Actions)
 
 Pushing to `master` automatically triggers the CI/CD pipeline:
+
 1. **CI Quality Gate**: Runs Ruff linter, Mypy typechecker, and Pytest test suite.
 2. **CD Deployment**: Connects to the VPS via SSH, updates the repository, updates dependencies, reloads the PM2 service (`snape-be`), and runs a post-deploy health check probe.
 
@@ -191,3 +198,18 @@ Pushing to `master` automatically triggers the CI/CD pipeline:
 - `VPS_SSH_PORT`: (Optional) SSH port (defaults to `22`)
 - `VPS_PROJECT_DIR`: (Optional) Path to project on VPS (defaults to `/home/voldemort/project/snape`)
 
+### VPS Service Management (PM2)
+
+```bash
+# Check status of backend & gateway services
+pm2 list
+
+# View live logs
+pm2 logs snape-be
+
+# Manual restart / reload
+pm2 reload snape-be --update-env
+
+# Restart using ecosystem config
+pm2 reload snape_be/ecosystem.config.cjs
+```
