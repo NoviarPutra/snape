@@ -71,6 +71,7 @@ class VoiceCallNotifier extends StateNotifier<VoiceCallState> {
       state = state.copyWith(
         errorMessage: 'Microphone / Speech recognition is not available.',
       );
+      return;
     }
 
     if (withGreeting) {

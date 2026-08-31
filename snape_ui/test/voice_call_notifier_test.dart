@@ -194,6 +194,15 @@ void main() {
       expect(voiceNotifier.state.assistantSpeech, isEmpty);
     });
 
+    test('startCall when speechService is unavailable sets errorMessage', () async {
+      mockSpeechService.isAvailable = false;
+      await voiceNotifier.startCall(withGreeting: true);
+
+      expect(voiceNotifier.state.errorMessage, isNotNull);
+      expect(voiceNotifier.state.errorMessage, contains('Microphone'));
+      expect(mockSpeechService.isListening, isFalse);
+    });
+
     test('startCall without greeting directly begins listening', () async {
       await voiceNotifier.startCall(withGreeting: false);
 
