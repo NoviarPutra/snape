@@ -174,3 +174,20 @@ npm run format   # cd snape_be && .venv/bin/ruff format .
 npm run ui:test      # cd snape_ui && flutter test
 npm run ui:analyze   # cd snape_ui && flutter analyze
 ```
+
+---
+
+## CI/CD Pipeline (GitHub Actions)
+
+Pushing to `master` automatically triggers the CI/CD pipeline:
+1. **CI Quality Gate**: Runs Ruff linter, Mypy typechecker, and Pytest test suite.
+2. **CD Deployment**: Connects to the VPS via SSH, updates the repository, updates dependencies, reloads the PM2 service (`snape-be`), and runs a post-deploy health check probe.
+
+### Required GitHub Secrets
+
+- `VPS_HOST`: IP / Hostname of the VPS (`103.174.114.224`)
+- `VPS_USER`: SSH username (`voldemort`)
+- `VPS_SSH_KEY`: Private SSH Key
+- `VPS_SSH_PORT`: (Optional) SSH port (defaults to `22`)
+- `VPS_PROJECT_DIR`: (Optional) Path to project on VPS (defaults to `/home/voldemort/project/snape`)
+

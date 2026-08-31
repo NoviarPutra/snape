@@ -1,0 +1,80 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+jobs:
+  ci-test:
+    name: Backend Lint & Tests
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: snape_be
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: snape_be/requirements.txt
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Ruff Linter
+        run: ruff check .
+
+      - name: Run Mypy Type Checker
+        run: mypy app
+
+      - name: Run Pytest Suite
+        run: pytest
+
+  cd-deploy:
+    name: Deploy to VPS
+    needs: ci-test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master'
+
+    steps:
+      - name: SSH and Deploy to VPS
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          passphrase: ${{ secrets.VPS_SSH_PASSPHRASE }}
+          port: ${{ secrets.VPS_SSH_PORT || 22 }}
+          script: |
+            set -e
+            PROJECT_DIR="${{ secrets.VPS_PROJECT_DIR || '/home/voldemort/project/snape' }}"
+            echo "🚀 Deploying Snape Backend to VPS at $PROJECT_DIR..."
+
+            cd "$PROJECT_DIR"
+            git fetch origin master
+            git reset --hard origin/master
+
+            cd snape_be
+            source .venv/bin/activate
+            pip install --upgrade pip
+            pip install -r requirements.txt
+
+            echo "🔄 Reloading PM2 process snape-be..."
+            pm2 reload ecosystem.config.cjs --update-env || pm2 start ecosystem.config.cjs
+
+            echo "🩺 Running health check probe..."
+            sleep 3
+            curl -f -s -o /dev/null -w "Backend Health: HTTP %{http_code}\n" http://127.0.0.1:8000/api/v1/docs
+
+            echo "✅ Deployment completed successfully!"
+            pm2 describe snape-be
