@@ -14,6 +14,33 @@ import '../widgets/voice_subtitle_card.dart';
 class VoiceCallScreen extends ConsumerStatefulWidget {
   const VoiceCallScreen({super.key});
 
+  static Route<void> route() {
+    return PageRouteBuilder<void>(
+      pageBuilder: (context, animation, secondaryAnimation) =>
+          const VoiceCallScreen(),
+      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+        final curvedAnimation = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeInCubic,
+        );
+        return SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0.0, 1.0),
+            end: Offset.zero,
+          ).animate(curvedAnimation),
+          child: FadeTransition(
+            opacity: curvedAnimation,
+            child: child,
+          ),
+        );
+      },
+      transitionDuration: const Duration(milliseconds: 300),
+      reverseTransitionDuration: const Duration(milliseconds: 250),
+      fullscreenDialog: true,
+    );
+  }
+
   @override
   ConsumerState<VoiceCallScreen> createState() => _VoiceCallScreenState();
 }
@@ -52,7 +79,12 @@ class _VoiceCallScreenState extends ConsumerState<VoiceCallScreen> {
               // Top Header
               VoiceCallHeader(
                 state: state,
-                onClose: () => Navigator.of(context).maybePop(),
+                onClose: () async {
+                  await notifier.endCall();
+                  if (context.mounted) {
+                    Navigator.of(context).maybePop();
+                  }
+                },
               ),
 
               // Error banner if mic / speech unavailable

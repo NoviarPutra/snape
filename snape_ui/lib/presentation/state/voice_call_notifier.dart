@@ -223,6 +223,7 @@ class VoiceCallNotifier extends StateNotifier<VoiceCallState> {
     _isSpeakingSubscription?.cancel();
     _chatRemoveListener?.call();
     speechService.stopListening();
+    audioQueueService?.stopAndClear();
     super.dispose();
   }
 }

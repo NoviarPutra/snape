@@ -9,6 +9,7 @@ class ChatInputBar extends StatefulWidget {
   final ValueChanged<String> onSendMessage;
   final bool isStreaming;
   final VoidCallback? onMicTap;
+  final VoidCallback? onVoiceCallTap;
   final bool isRecording;
   final bool showMicButton;
   final TextEditingController? controller;
@@ -18,6 +19,7 @@ class ChatInputBar extends StatefulWidget {
     required this.onSendMessage,
     this.isStreaming = false,
     this.onMicTap,
+    this.onVoiceCallTap,
     this.isRecording = false,
     this.showMicButton = false,
     this.controller,
@@ -170,34 +172,53 @@ class _ChatInputBarState extends State<ChatInputBar> {
             ),
           ),
           SizedBox(width: AppSpacing.xs.w),
-          // Send Action Button
-          Container(
-            width: buttonSize,
-            height: buttonSize,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: (_hasText && !widget.isStreaming)
-                  ? AppColors.indigoAccent
-                  : AppColors.surfaceCard,
-              border: Border.all(
-                color: (_hasText && !widget.isStreaming)
-                    ? AppColors.indigoAccent
-                    : AppColors.dividerColor,
-                width: 1,
-              ),
-            ),
-            child: IconButton(
-              onPressed: (_hasText && !widget.isStreaming) ? _handleSubmit : null,
-              padding: EdgeInsets.zero,
-              icon: Icon(
-                Icons.arrow_upward_rounded,
-                color: (_hasText && !widget.isStreaming)
-                    ? Colors.white
-                    : AppColors.slateMuted.withValues(alpha: 0.5),
-                size: 20.r,
-              ),
-              tooltip: 'Send Message',
-            ),
+          // Send / Quick Voice Call Action Button
+          Builder(
+            builder: (context) {
+              final isSendActive = _hasText && !widget.isStreaming;
+              final isVoiceCallActive = !_hasText && !widget.isStreaming && widget.onVoiceCallTap != null;
+
+              return Container(
+                width: buttonSize,
+                height: buttonSize,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isSendActive
+                      ? AppColors.indigoAccent
+                      : (isVoiceCallActive
+                          ? AppColors.indigoAccent.withValues(alpha: 0.12)
+                          : AppColors.surfaceCard),
+                  border: Border.all(
+                    color: (isSendActive || isVoiceCallActive)
+                        ? AppColors.indigoAccent
+                        : AppColors.dividerColor,
+                    width: 1,
+                  ),
+                ),
+                child: IconButton(
+                  onPressed: isSendActive
+                      ? _handleSubmit
+                      : (isVoiceCallActive ? widget.onVoiceCallTap : null),
+                  padding: EdgeInsets.zero,
+                  icon: Icon(
+                    isSendActive
+                        ? Icons.arrow_upward_rounded
+                        : (widget.onVoiceCallTap != null
+                            ? Icons.phone_in_talk_rounded
+                            : Icons.arrow_upward_rounded),
+                    color: isSendActive
+                        ? Colors.white
+                        : (isVoiceCallActive
+                            ? AppColors.indigoAccent
+                            : AppColors.slateMuted.withValues(alpha: 0.5)),
+                    size: 20.r,
+                  ),
+                  tooltip: isSendActive
+                      ? 'Send Message'
+                      : (widget.onVoiceCallTap != null ? 'Start Voice Call' : 'Send Message'),
+                ),
+              );
+            },
           ),
         ],
       ),

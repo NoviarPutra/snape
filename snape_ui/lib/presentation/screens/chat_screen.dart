@@ -13,6 +13,7 @@ import '../widgets/connection_status_banner.dart';
 import '../widgets/memory_drawer.dart';
 import '../widgets/message_bubble.dart';
 import '../widgets/session_drawer.dart';
+import 'voice_call_screen.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   const ChatScreen({super.key});
@@ -114,6 +115,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
   }
 
+  void _openVoiceCall() {
+    if (_isRecording) {
+      _speechService.stopListening();
+      if (mounted) {
+        setState(() {
+          _isRecording = false;
+        });
+      }
+    }
+    Navigator.of(context).push(VoiceCallScreen.route());
+  }
+
   @override
   void dispose() {
     _speechService.stopListening();
@@ -199,6 +212,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         ),
         actions: [
           IconButton(
+            icon: Icon(Icons.phone_in_talk_rounded, size: 22.r, color: AppColors.indigoAccent),
+            tooltip: 'Start Voice Call',
+            onPressed: _openVoiceCall,
+          ),
+          IconButton(
             icon: Icon(Icons.psychology_outlined, size: 22.r, color: AppColors.indigoAccent),
             tooltip: 'Memory Drawer',
             onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
@@ -253,6 +271,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             isStreaming: chatState.isStreaming,
             isRecording: _isRecording,
             onMicTap: _toggleVoiceRecording,
+            onVoiceCallTap: _openVoiceCall,
             onSendMessage: (text) {
               ref.read(chatProvider.notifier).sendMessage(text);
             },
