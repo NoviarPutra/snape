@@ -39,6 +39,10 @@ class Settings(BaseSettings):
     DB_POOL_TIMEOUT: int = 30
     DB_POOL_RECYCLE: int = 300
 
+    # Obsidian Vault Integration
+    OBSIDIAN_VAULT_PATH: str = "/home/voldemort/obsidian-stack/vault"
+    OBSIDIAN_ENABLED: bool = True
+
     # LLM & OmniRoute Gateway
     OMNIROUTE_BASE_URL: str = "http://localhost:20128/v1"
     OMNIROUTE_API_KEY: str = Field(default="", description="OmniRoute API key")

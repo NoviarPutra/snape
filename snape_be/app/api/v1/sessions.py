@@ -11,6 +11,8 @@ from app.schemas.session import (
     SessionUpdate,
 )
 from app.services import session_service, user_service
+from app.services.memory_service import get_memory_service
+from app.services.obsidian_service import get_obsidian_service
 
 router = APIRouter(prefix="/sessions", tags=["Sessions"])
 
@@ -74,3 +76,46 @@ async def delete_session_endpoint(
     deleted = await session_service.delete_session(db, session_id=session_id)
     if not deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+
+
+@router.post("/{session_id}/export-obsidian")
+async def export_session_to_obsidian(
+    session_id: UUID,
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, str | bool]:
+    """Manually export a session transcript & learnings to the Obsidian Vault."""
+    session = await session_service.get_session_by_id(
+        db, session_id=session_id, include_messages=True
+    )
+    if not session:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+
+    obsidian_service = get_obsidian_service()
+    if not obsidian_service.enabled:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Obsidian integration is disabled in configuration",
+        )
+
+    user = await user_service.get_or_create_default_user(db)
+    memory_service = get_memory_service()
+    memories = await memory_service.list_memories(db=db, user_id=user.id, limit=20)
+
+    file_path = await obsidian_service.export_session_journal(
+        session_id=session_id,
+        session_title=session.title,
+        messages=session.messages,
+        memories=[m.content for m in memories],
+    )
+
+    if not file_path:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to write journal to Obsidian vault",
+        )
+
+    return {
+        "success": True,
+        "path": str(file_path),
+        "message": "Session exported successfully to Obsidian vault",
+    }

@@ -17,6 +17,7 @@ from app.schemas.message import MessageCreate
 from app.services import session_service, user_service
 from app.services.llm_service import BaseLLMService, get_llm_service
 from app.services.memory_service import MemoryService, get_memory_service
+from app.services.obsidian_service import ObsidianService, get_obsidian_service
 from app.services.sentence_chunker import SentenceChunker
 from app.services.tts_service import BaseTTSProvider, get_tts_provider
 
@@ -49,18 +50,20 @@ StreamEvent = StreamTokenEvent | StreamAudioEvent | StreamDoneEvent
 
 
 class ChatPipeline:
-    """Orchestrates turn-level LLM streaming, vector recall, memory extraction, and audio."""
+    """Orchestrates turn-level LLM streaming, vector recall, memory extraction, audio, and Obsidian sync."""
 
     def __init__(
         self,
         llm_service: BaseLLMService | None = None,
         memory_service: MemoryService | None = None,
         tts_provider: BaseTTSProvider | None = None,
+        obsidian_service: ObsidianService | None = None,
         enable_tts: bool | None = None,
     ) -> None:
         self.llm_service = llm_service or get_llm_service()
         self.memory_service = memory_service or get_memory_service()
         self.tts_provider = tts_provider or get_tts_provider()
+        self.obsidian_service = obsidian_service or get_obsidian_service()
         self.enable_tts = enable_tts if enable_tts is not None else settings.ENABLE_TTS
 
     async def stream_turn(
@@ -101,7 +104,15 @@ class ChatPipeline:
             except Exception as exc:
                 logger.warning("Failed to recall memories for user %s: %s", user.id, exc)
 
-        # 5. Persist user message
+        # 5. Load curated topics from Obsidian Vault (zero-overhead)
+        curated_topics: list[str] = []
+        if self.obsidian_service and self.obsidian_service.enabled:
+            try:
+                curated_topics = await self.obsidian_service.load_curated_topics(limit=3)
+            except Exception as exc:
+                logger.debug("Could not load Obsidian topics: %s", exc)
+
+        # 6. Persist user message
         user_message = await session_service.add_message(
             db,
             session_id=session_id,
@@ -109,15 +120,19 @@ class ChatPipeline:
         )
         await db.commit()
 
-        # 6. Build dynamic system prompt and structured messages
-        system_instruction = build_system_prompt(user=user, memories=recalled_memories)
+        # 7. Build dynamic system prompt and structured messages
+        system_instruction = build_system_prompt(
+            user=user,
+            memories=recalled_memories,
+            curated_topics=curated_topics,
+        )
         messages = build_conversation_messages(
             history=recent_history,
             current_user_message=user_content,
             buffer_size=DEFAULT_BUFFER_SIZE,
         )
 
-        # 7. Stream tokens from LLM and synthesize completed sentences
+        # 8. Stream LLM tokens and synthesize audio sentences
         chunker = SentenceChunker() if self.enable_tts else None
         accumulated_tokens: list[str] = []
 
@@ -169,7 +184,7 @@ class ChatPipeline:
                             "TTS synthesis failed for flushed sentence '%s': %s", clean_text, exc
                         )
 
-        # 8. Persist assistant response
+        # 9. Persist assistant response
         full_text = "".join(accumulated_tokens)
         assistant_message = await session_service.add_message(
             db,
@@ -182,7 +197,7 @@ class ChatPipeline:
         )
         await db.commit()
 
-        # 9. Extract and persist newly revealed memories
+        # 10. Extract and persist newly revealed memories
         extracted_memories: list[str] = []
         try:
             extracted_memories = await self.memory_service.extract_and_persist(
@@ -191,10 +206,17 @@ class ChatPipeline:
                 user_content=user_content,
                 recent_history=recent_history,
             )
+            # Sync user profile to Obsidian asynchronously
+            if extracted_memories and self.obsidian_service and self.obsidian_service.enabled:
+                all_memories = await self.memory_service.list_memories(db=db, user_id=user.id, limit=20)
+                await self.obsidian_service.sync_user_profile(
+                    user=user,
+                    memories=[m.content for m in all_memories],
+                )
         except Exception as exc:
             logger.warning("Error during memory extraction in chat pipeline: %s", exc)
 
-        # 10. Yield completion event
+        # 11. Yield completion event
         yield StreamDoneEvent(
             session_id=session_id,
             user_message_id=user_message.id,
@@ -202,3 +224,29 @@ class ChatPipeline:
             full_text=full_text,
             extracted_memories=extracted_memories,
         )
+
+    async def export_session_journal(self, db: AsyncSession, session_id: UUID) -> None:
+        """Export session transcript and takeaways to Obsidian vault."""
+        if not self.obsidian_service or not self.obsidian_service.enabled:
+            return
+
+        try:
+            session = await session_service.get_session_by_id(db, session_id)
+            if not session:
+                return
+
+            messages = await session_service.get_session_messages(db, session_id)
+            if not messages:
+                return
+
+            user = await user_service.get_or_create_default_user(db)
+            memories = await self.memory_service.list_memories(db=db, user_id=user.id, limit=10)
+
+            await self.obsidian_service.export_session_journal(
+                session_id=session_id,
+                session_title=session.title,
+                messages=messages,
+                memories=[m.content for m in memories],
+            )
+        except Exception as exc:
+            logger.warning("Failed to export session journal on session finish: %s", exc)

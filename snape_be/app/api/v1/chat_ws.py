@@ -133,3 +133,9 @@ async def chat_websocket_endpoint(
         logger.info("WebSocket client disconnected: session_id=%s", session_id)
     except Exception as exc:
         logger.exception("Unexpected error in WebSocket connection: %s", exc)
+    finally:
+        # Export session journal to Obsidian asynchronously on disconnect
+        try:
+            await pipeline.export_session_journal(db=db, session_id=session_id)
+        except Exception as exc:
+            logger.warning("Auto-export to Obsidian failed on WS close: %s", exc)

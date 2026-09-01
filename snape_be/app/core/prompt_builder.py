@@ -41,8 +41,9 @@ Core Principles:
 def build_system_prompt(
     user: User | None = None,
     memories: list[str] | None = None,
+    curated_topics: list[str] | None = None,
 ) -> str:
-    """Construct dynamic system prompt with user profile and episodic memory context."""
+    """Construct dynamic system prompt with user profile, episodic memory context, and Obsidian topics."""
     sections = [BASE_SYSTEM_INSTRUCTION.strip()]
 
     # User Profile Details
@@ -67,6 +68,16 @@ def build_system_prompt(
         )
         sections.append("\n".join(memory_info))
 
+    # Curated Topics from Obsidian Knowledge Base
+    if curated_topics and len(curated_topics) > 0:
+        topic_info = ["Suggested Discussion Topics from Obsidian Knowledge Base:"]
+        for topic in curated_topics:
+            topic_info.append(f"- {topic.strip()}")
+        topic_info.append(
+            "If the conversation naturally slows or the learner asks for something interesting to talk about, feel free to introduce or connect to these topics."
+        )
+        sections.append("\n".join(topic_info))
+
     return "\n\n".join(sections)
 
 
@@ -80,19 +91,7 @@ def build_conversation_messages(
     messages: list[dict[str, str]] = []
 
     for msg in recent_history:
-        role = "assistant" if msg.role == "assistant" else "user"
-        messages.append(
-            {
-                "role": role,
-                "content": msg.content,
-            }
-        )
+        messages.append({"role": msg.role, "content": msg.content})
 
-    messages.append(
-        {
-            "role": "user",
-            "content": current_user_message,
-        }
-    )
-
+    messages.append({"role": "user", "content": current_user_message})
     return messages
