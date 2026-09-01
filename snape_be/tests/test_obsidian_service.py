@@ -1,5 +1,4 @@
-import asyncio
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
 
@@ -37,14 +36,14 @@ async def test_obsidian_service_topics_and_export(tmp_path: Path):
         session_id=session_id,
         role="user",
         content="I want to learn more about AI.",
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
     asst_msg = ChatMessage(
         id=uuid4(),
         session_id=session_id,
         role="assistant",
         content="AI is a fascinating topic! What area interests you most?",
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
 
     file_path = await service.export_session_journal(

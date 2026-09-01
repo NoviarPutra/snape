@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from uuid import UUID
 
@@ -37,7 +37,7 @@ class ObsidianService:
                 try:
                     lines: list[str] = []
                     in_frontmatter = False
-                    with open(md_file, "r", encoding="utf-8", errors="ignore") as f:
+                    with open(md_file, encoding="utf-8", errors="ignore") as f:
                         for _ in range(25):
                             line = f.readline()
                             if not line:
@@ -78,7 +78,7 @@ class ObsidianService:
         """Write session journal markdown file synchronously."""
         self._ensure_dirs()
         sessions_dir = self.snape_dir / "Sessions"
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         date_str = now.strftime("%Y-%m-%d")
         short_id = str(session_id)[:8]
         file_path = sessions_dir / f"{date_str}_{short_id}.md"
@@ -108,7 +108,11 @@ class ObsidianService:
         content_lines.append("## Conversation Transcript")
         for msg in messages:
             role_label = "Learner" if msg.role == "user" else "Snape"
-            timestamp = msg.created_at.strftime("%H:%M") if hasattr(msg, "created_at") and msg.created_at else ""
+            timestamp = (
+                msg.created_at.strftime("%H:%M")
+                if hasattr(msg, "created_at") and msg.created_at
+                else ""
+            )
             time_tag = f" [{timestamp}]" if timestamp else ""
             content_lines.append(f"**{role_label}**{time_tag}:\n{msg.content.strip()}\n")
 
@@ -143,7 +147,7 @@ class ObsidianService:
         """Sync learner profile and accumulated memories."""
         self._ensure_dirs()
         profile_file = self.snape_dir / "Profile" / "User.md"
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         lines = [
             "---",

@@ -50,7 +50,7 @@ StreamEvent = StreamTokenEvent | StreamAudioEvent | StreamDoneEvent
 
 
 class ChatPipeline:
-    """Orchestrates turn-level LLM streaming, vector recall, memory extraction, audio, and Obsidian sync."""
+    """Orchestrates turn-level LLM streaming, vector recall, and Obsidian sync."""
 
     def __init__(
         self,
@@ -208,7 +208,9 @@ class ChatPipeline:
             )
             # Sync user profile to Obsidian asynchronously
             if extracted_memories and self.obsidian_service and self.obsidian_service.enabled:
-                all_memories = await self.memory_service.list_memories(db=db, user_id=user.id, limit=20)
+                all_memories = await self.memory_service.list_memories(
+                    db=db, user_id=user.id, limit=20
+                )
                 await self.obsidian_service.sync_user_profile(
                     user=user,
                     memories=[m.content for m in all_memories],

@@ -43,7 +43,7 @@ def build_system_prompt(
     memories: list[str] | None = None,
     curated_topics: list[str] | None = None,
 ) -> str:
-    """Construct dynamic system prompt with user profile, episodic memory context, and Obsidian topics."""
+    """Construct dynamic system prompt with user profile, memory context, and Obsidian topics."""
     sections = [BASE_SYSTEM_INSTRUCTION.strip()]
 
     # User Profile Details
@@ -74,7 +74,8 @@ def build_system_prompt(
         for topic in curated_topics:
             topic_info.append(f"- {topic.strip()}")
         topic_info.append(
-            "If the conversation naturally slows or the learner asks for something interesting to talk about, feel free to introduce or connect to these topics."
+            "If the conversation naturally slows or the learner asks for topics to discuss,\n"
+            "feel free to introduce or connect to these topics."
         )
         sections.append("\n".join(topic_info))
 
