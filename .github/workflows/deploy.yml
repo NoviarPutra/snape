@@ -38,7 +38,8 @@ jobs:
         run: mypy app
 
       - name: Run Pytest Suite
-        run: pytest
+        run: pytest -v
+        timeout-minutes: 5
 
   cd-deploy:
     name: Deploy to VPS

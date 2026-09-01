@@ -120,10 +120,14 @@ class EdgeTTSProvider(BaseTTSProvider):
 
             communicate = edge_tts.Communicate(text, self.voice)
             chunks: list[bytes] = []
-            async for chunk in communicate.stream():
-                if chunk["type"] == "audio":
-                    chunks.append(chunk["data"])
-            audio_bytes = b"".join(chunks)
+
+            async def _collect_stream() -> bytes:
+                async for chunk in communicate.stream():
+                    if chunk["type"] == "audio":
+                        chunks.append(chunk["data"])
+                return b"".join(chunks)
+
+            audio_bytes = await asyncio.wait_for(_collect_stream(), timeout=5.0)
             if audio_bytes:
                 return audio_bytes
             return generate_mock_wav(text=text, sample_rate=self._sample_rate)

@@ -33,6 +33,9 @@ def setup_test_env() -> None:
     """Configure test environment settings."""
     settings.APP_ENV = "testing"
     settings.DEBUG = True
+    settings.ENABLE_TTS = False
+    settings.TTS_PROVIDER = "mock"
+    settings.OBSIDIAN_ENABLED = False
 
 
 @pytest.fixture
