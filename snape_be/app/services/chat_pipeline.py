@@ -208,7 +208,7 @@ class ChatPipeline:
             )
             # Sync user profile to Obsidian asynchronously
             if extracted_memories and self.obsidian_service and self.obsidian_service.enabled:
-                all_memories = await self.memory_service.list_memories(
+                all_memories = await self.memory_service.get_memories(
                     db=db, user_id=user.id, limit=20
                 )
                 await self.obsidian_service.sync_user_profile(
@@ -233,21 +233,21 @@ class ChatPipeline:
             return
 
         try:
-            session = await session_service.get_session_by_id(db, session_id)
-            if not session:
-                return
-
-            messages = await session_service.get_session_messages(db, session_id)
-            if not messages:
+            session = await session_service.get_session_by_id(
+                db, session_id=session_id, include_messages=True
+            )
+            if not session or not session.messages:
                 return
 
             user = await user_service.get_or_create_default_user(db)
-            memories = await self.memory_service.list_memories(db=db, user_id=user.id, limit=10)
+            memories = await self.memory_service.get_memories(
+                db=db, user_id=user.id, limit=10
+            )
 
             await self.obsidian_service.export_session_journal(
                 session_id=session_id,
                 session_title=session.title,
-                messages=messages,
+                messages=list(session.messages),
                 memories=[m.content for m in memories],
             )
         except Exception as exc:

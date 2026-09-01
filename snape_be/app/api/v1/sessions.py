@@ -99,12 +99,12 @@ async def export_session_to_obsidian(
 
     user = await user_service.get_or_create_default_user(db)
     memory_service = get_memory_service()
-    memories = await memory_service.list_memories(db=db, user_id=user.id, limit=20)
+    memories = await memory_service.get_memories(db=db, user_id=user.id, limit=20)
 
     file_path = await obsidian_service.export_session_journal(
         session_id=session_id,
         session_title=session.title,
-        messages=session.messages,
+        messages=list(session.messages) if session.messages else [],
         memories=[m.content for m in memories],
     )
 
