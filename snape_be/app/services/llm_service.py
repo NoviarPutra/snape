@@ -194,6 +194,8 @@ class MockLLMService(BaseLLMService):
             "What kind did you pick up?",
         ]
         self.delay_per_token = delay_per_token
+        self.last_system_instruction: str | None = None
+        self.last_contents: list[dict[str, Any]] | None = None
 
     async def stream_chat(
         self,
@@ -202,6 +204,8 @@ class MockLLMService(BaseLLMService):
         temperature: float = 0.7,
     ) -> AsyncGenerator[str, None]:
         """Yield canned tokens sequentially with optional simulated network latency."""
+        self.last_system_instruction = system_instruction
+        self.last_contents = contents
         for token in self.canned_tokens:
             if self.delay_per_token > 0:
                 await asyncio.sleep(self.delay_per_token)
@@ -215,6 +219,8 @@ class MockLLMService(BaseLLMService):
         response_format_json: bool = False,
     ) -> str:
         """Return concatenated canned tokens."""
+        self.last_system_instruction = system_instruction
+        self.last_contents = contents
         return "".join(self.canned_tokens)
 
 

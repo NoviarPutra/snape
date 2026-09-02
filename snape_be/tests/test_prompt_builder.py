@@ -3,6 +3,7 @@ from app.core.prompt_builder import (
     build_conversation_messages,
     build_system_prompt,
 )
+from app.core.space_config import get_space_config
 from app.db.models import ChatMessage, User
 
 
@@ -85,3 +86,20 @@ def test_build_conversation_messages_rolling_buffer() -> None:
     assert len(contents) == 6
     assert contents[0] == {"role": "user", "content": "Message 3"}
     assert contents[-1] == {"role": "user", "content": "Message 8"}
+
+
+def test_build_system_prompt_with_tech_space() -> None:
+    tech_config = get_space_config("tech")
+    prompt = build_system_prompt(space_config=tech_config)
+    assert "software engineer senior" in prompt
+    assert "Bahasa ID" in prompt or "Bahasa Indonesia" in prompt
+    assert "Soft Correction" not in prompt
+    assert "Bilingual Bridge" not in prompt
+    assert "native English companion" not in prompt
+
+
+def test_build_system_prompt_with_english_a1_space() -> None:
+    a1_config = get_space_config("english_a1")
+    prompt = build_system_prompt(space_config=a1_config)
+    assert "CEFR A1" in prompt
+    assert "very simple, clear, and short sentences" in prompt

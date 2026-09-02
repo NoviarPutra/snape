@@ -12,6 +12,7 @@ from app.core.prompt_builder import (
     build_conversation_messages,
     build_system_prompt,
 )
+from app.core.space_config import get_space_config
 from app.core.text_sanitizer import sanitize_text_for_tts
 from app.schemas.message import MessageCreate
 from app.services import session_service, user_service
@@ -79,6 +80,8 @@ class ChatPipeline:
         if session is None:
             raise ValueError(f"Session not found for id: {session_id}")
 
+        space_config = get_space_config(session.space_slug)
+
         # 2. Get user profile
         user = await user_service.get_or_create_default_user(db)
 
@@ -125,6 +128,7 @@ class ChatPipeline:
             user=user,
             memories=recalled_memories,
             curated_topics=curated_topics,
+            space_config=space_config,
         )
         messages = build_conversation_messages(
             history=recent_history,
@@ -133,7 +137,8 @@ class ChatPipeline:
         )
 
         # 8. Stream LLM tokens and synthesize audio sentences
-        chunker = SentenceChunker() if self.enable_tts else None
+        should_enable_tts = self.enable_tts and space_config.tts_enabled
+        chunker = SentenceChunker() if should_enable_tts else None
         accumulated_tokens: list[str] = []
 
         async for token in self.llm_service.stream_chat(

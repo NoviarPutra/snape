@@ -112,3 +112,75 @@ async def test_chat_pipeline_invalid_session(db_session: AsyncSession) -> None:
             user_content="Hello",
         ):
             pass
+
+
+@pytest.mark.asyncio
+async def test_chat_pipeline_tech_space_no_tts_and_indonesian_prompt(
+    db_session: AsyncSession,
+) -> None:
+    user = await user_service.get_or_create_default_user(db_session)
+    session = await session_service.create_session(
+        db_session,
+        user_id=user.id,
+        session_in=SessionCreate(title="Tech Discussion", space_slug="tech"),
+    )
+    await db_session.commit()
+
+    mock_tokens = ["Arsitektur ", "microservices ", "memiliki ", "trade-offs."]
+    mock_llm = MockLLMService(canned_tokens=mock_tokens)
+    mock_tts = MockTTSProvider(sample_rate=24000)
+    pipeline = ChatPipeline(llm_service=mock_llm, tts_provider=mock_tts, enable_tts=True)
+
+    events = []
+    async for event in pipeline.stream_turn(
+        db=db_session,
+        session_id=session.id,
+        user_content="Bagaimana menurutmu tentang microservices?",
+    ):
+        events.append(event)
+
+    # 1. Verify system instruction sent to LLM contains Indonesian tech instructions
+    assert mock_llm.last_system_instruction is not None
+    assert "software engineer senior" in mock_llm.last_system_instruction
+    assert "Soft Correction" not in mock_llm.last_system_instruction
+
+    # 2. Verify NO audio events generated because tech space has tts_enabled=False
+    audio_events = [e for e in events if isinstance(e, StreamAudioEvent)]
+    assert len(audio_events) == 0
+
+    token_events = [e for e in events if isinstance(e, StreamTokenEvent)]
+    assert len(token_events) == len(mock_tokens)
+
+
+@pytest.mark.asyncio
+async def test_chat_pipeline_english_a1_space_system_prompt(
+    db_session: AsyncSession,
+) -> None:
+    user = await user_service.get_or_create_default_user(db_session)
+    session = await session_service.create_session(
+        db_session,
+        user_id=user.id,
+        session_in=SessionCreate(title="A1 Chat", space_slug="english_a1"),
+    )
+    await db_session.commit()
+
+    mock_tokens = ["Hello ", "friend."]
+    mock_llm = MockLLMService(canned_tokens=mock_tokens)
+    mock_tts = MockTTSProvider(sample_rate=24000)
+    pipeline = ChatPipeline(llm_service=mock_llm, tts_provider=mock_tts, enable_tts=True)
+
+    events = []
+    async for event in pipeline.stream_turn(
+        db=db_session,
+        session_id=session.id,
+        user_content="Hello",
+    ):
+        events.append(event)
+
+    assert mock_llm.last_system_instruction is not None
+    assert "CEFR A1" in mock_llm.last_system_instruction
+    assert "very simple, clear, and short sentences" in mock_llm.last_system_instruction
+
+    # English A1 has tts_enabled=True, so audio event is generated
+    audio_events = [e for e in events if isinstance(e, StreamAudioEvent)]
+    assert len(audio_events) == 1
