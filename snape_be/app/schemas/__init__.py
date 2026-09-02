@@ -8,6 +8,7 @@ from app.schemas.session import (
     SessionResponse,
     SessionUpdate,
 )
+from app.schemas.space import SpacePublicResponse
 from app.schemas.tts import TTSSynthesizeRequest
 from app.schemas.user import UserBase, UserCreate, UserResponse, UserUpdate
 
@@ -22,6 +23,7 @@ __all__ = [
     "SessionUpdate",
     "SessionResponse",
     "SessionDetailResponse",
+    "SpacePublicResponse",
     "MessageBase",
     "MessageCreate",
     "MessageResponse",
