@@ -1,5 +1,6 @@
 import math
 import resource
+import sys
 import time
 from collections.abc import AsyncGenerator
 from typing import Any
@@ -414,10 +415,14 @@ async def test_db_connection_lifecycle_and_leak_prevention() -> None:
 @pytest.mark.asyncio
 async def test_deployment_resource_profile() -> None:
     """Verify that process active memory footprint fits in 2 vCPU / 2 GB profile (< 1.2 GB)."""
-    # Check max RSS memory on Linux (ru_maxrss is in kilobytes on Linux)
+    # Check max RSS memory (ru_maxrss is in bytes on macOS/Darwin, kilobytes on Linux)
     usage = resource.getrusage(resource.RUSAGE_SELF)
-    max_rss_kb = usage.ru_maxrss
-    max_rss_gb = max_rss_kb / (1024 * 1024)
+    max_rss_bytes = (
+        usage.ru_maxrss
+        if sys.platform == "darwin"
+        else usage.ru_maxrss * 1024
+    )
+    max_rss_gb = max_rss_bytes / (1024 * 1024 * 1024)
 
     # Active memory must be < 1.2 GB for the 2 GB RAM profile
     assert max_rss_gb < 1.2, (
