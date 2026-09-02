@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../../core/services/audio_queue_service.dart';
@@ -16,12 +18,19 @@ class ChatNotifier extends StateNotifier<ChatState> {
   StreamSubscription<bool>? _speakingSubscription;
   Timer? _reconnectTimer;
   int _reconnectAttempts = 0;
+  bool _autoplayAudio = false;
   static const int _maxReconnectAttempts = 5;
   static const _uuid = Uuid();
 
   ChatNotifier(this._repository, [this._audioQueueService])
       : super(const ChatState()) {
     _listenToStreams();
+  }
+
+  bool get isAutoplayAudio => _autoplayAudio;
+
+  void setAutoplayAudio(bool enabled) {
+    _autoplayAudio = enabled;
   }
 
   void _listenToStreams() {
@@ -61,7 +70,14 @@ class ChatNotifier extends StateNotifier<ChatState> {
     if (_audioQueueService != null) {
       _speakingSubscription =
           _audioQueueService.isSpeakingStream.listen((speaking) {
-        state = state.copyWith(isSpeaking: speaking);
+        if (!speaking) {
+          state = state.copyWith(
+            isSpeaking: false,
+            clearPlayingMessageId: true,
+          );
+        } else {
+          state = state.copyWith(isSpeaking: true);
+        }
       });
     }
   }
@@ -82,6 +98,8 @@ class ChatNotifier extends StateNotifier<ChatState> {
       isStreaming: false,
       clearError: true,
       clearStreamingId: true,
+      clearPlayingMessageId: true,
+      clearLoadingAudioMessageId: true,
     );
 
     try {
@@ -156,7 +174,9 @@ class ChatNotifier extends StateNotifier<ChatState> {
         return m.copyWith(
           isStreaming: false,
           status: m.content.isEmpty ? MessageStatus.error : MessageStatus.delivered,
-          content: m.content.isEmpty ? 'Message interrupted' : m.content,
+          content: m.content.isEmpty
+              ? 'Response was interrupted. Please send again.'
+              : m.content,
         );
       }
       return m;
@@ -194,6 +214,8 @@ class ChatNotifier extends StateNotifier<ChatState> {
       isStreaming: true,
       currentStreamingId: streamingAssistantId,
       clearError: true,
+      clearPlayingMessageId: true,
+      clearLoadingAudioMessageId: true,
     );
 
     try {
@@ -224,7 +246,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
       case WSTokenEvent(:final content):
         _onTokenReceived(content);
       case WSAudioEvent(:final audioBase64, :final sentence):
-        _audioQueueService?.enqueueBase64(audioBase64, sentence: sentence);
+        _onAudioReceived(audioBase64, sentence: sentence);
       case WSDoneEvent(
           :final fullText,
           :final userMessageId,
@@ -246,6 +268,27 @@ class ChatNotifier extends StateNotifier<ChatState> {
         break;
       case WSUnknownEvent():
         break;
+    }
+  }
+
+  void _onAudioReceived(String audioBase64, {String? sentence}) {
+    if (audioBase64.trim().isEmpty) return;
+    try {
+      final cleaned = audioBase64.replaceAll(RegExp(r'\s+'), '');
+      final bytes = base64Decode(cleaned);
+
+      if (state.currentStreamingId.isNotEmpty) {
+        final currentChunks = state.audioBuffers[state.currentStreamingId] ?? [];
+        final newBuffers = Map<String, List<Uint8List>>.from(state.audioBuffers);
+        newBuffers[state.currentStreamingId] = [...currentChunks, bytes];
+        state = state.copyWith(audioBuffers: newBuffers);
+      }
+
+      if (_autoplayAudio) {
+        _audioQueueService?.enqueueBytes(bytes);
+      }
+    } catch (e) {
+      // Ignore base64 audio decoding errors gracefully
     }
   }
 
@@ -275,6 +318,19 @@ class ChatNotifier extends StateNotifier<ChatState> {
     String? assistantMessageId,
     List<String> extractedMemories = const [],
   }) {
+    final targetId = assistantMessageId ?? state.currentStreamingId;
+    final newBuffers = Map<String, List<Uint8List>>.from(state.audioBuffers);
+
+    if (state.currentStreamingId.isNotEmpty &&
+        targetId.isNotEmpty &&
+        state.currentStreamingId != targetId &&
+        newBuffers.containsKey(state.currentStreamingId)) {
+      final buffer = newBuffers.remove(state.currentStreamingId);
+      if (buffer != null) {
+        newBuffers[targetId] = buffer;
+      }
+    }
+
     final updatedMessages = state.messages.map((msg) {
       if (msg.id == state.currentStreamingId) {
         return msg.copyWith(
@@ -293,7 +349,61 @@ class ChatNotifier extends StateNotifier<ChatState> {
       isStreaming: false,
       clearStreamingId: true,
       lastExtractedMemories: extractedMemories,
+      audioBuffers: newBuffers,
     );
+  }
+
+  Future<void> playMessageAudio(String messageId, String content) async {
+    if (state.playingMessageId == messageId && state.isSpeaking) {
+      stopAudio();
+      return;
+    }
+
+    _audioQueueService?.stopAndClear();
+
+    final cachedChunks = state.audioBuffers[messageId];
+    if (cachedChunks != null && cachedChunks.isNotEmpty) {
+      state = state.copyWith(
+        playingMessageId: messageId,
+        clearLoadingAudioMessageId: true,
+      );
+      for (final chunk in cachedChunks) {
+        _audioQueueService?.enqueueBytes(chunk);
+      }
+      return;
+    }
+
+    final trimmed = content.trim();
+    if (trimmed.isEmpty) return;
+
+    state = state.copyWith(
+      loadingAudioMessageId: messageId,
+      clearPlayingMessageId: true,
+    );
+
+    try {
+      final audioBytes = await _repository.synthesizeAudio(trimmed);
+      final newBuffers = Map<String, List<Uint8List>>.from(state.audioBuffers);
+      newBuffers[messageId] = [audioBytes];
+
+      state = state.copyWith(
+        clearLoadingAudioMessageId: true,
+        playingMessageId: messageId,
+        audioBuffers: newBuffers,
+      );
+
+      _audioQueueService?.enqueueBytes(audioBytes);
+    } catch (e) {
+      state = state.copyWith(
+        clearLoadingAudioMessageId: true,
+        errorMessage: 'Failed to play audio: $e',
+      );
+    }
+  }
+
+  void stopAudio() {
+    _audioQueueService?.stopAndClear();
+    state = state.copyWith(clearPlayingMessageId: true);
   }
 
   @override

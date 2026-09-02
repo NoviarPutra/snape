@@ -10,10 +10,18 @@ import 'typing_indicator.dart';
 
 class MessageBubble extends StatelessWidget {
   final ChatMessage message;
+  final bool isPlaying;
+  final bool isLoadingAudio;
+  final VoidCallback? onPlayAudio;
+  final VoidCallback? onStopAudio;
 
   const MessageBubble({
     super.key,
     required this.message,
+    this.isPlaying = false,
+    this.isLoadingAudio = false,
+    this.onPlayAudio,
+    this.onStopAudio,
   });
 
   @override
@@ -155,6 +163,72 @@ class MessageBubble extends StatelessWidget {
                       ),
                     ),
                   ),
+                ],
+                if (!isUser && !message.isStreaming && message.content.isNotEmpty) ...[
+                  InkWell(
+                    onTap: isLoadingAudio
+                        ? null
+                        : (isPlaying ? onStopAudio : onPlayAudio),
+                    borderRadius: BorderRadius.circular(AppRadii.pill.r),
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 2.h),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (isLoadingAudio) ...[
+                            SizedBox(
+                              width: 12.r,
+                              height: 12.r,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 1.5.r,
+                                valueColor: const AlwaysStoppedAnimation<Color>(
+                                  AppColors.indigoAccent,
+                                ),
+                              ),
+                            ),
+                            SizedBox(width: 4.w),
+                            Text(
+                              'Loading...',
+                              style: AppTypography.caption.copyWith(
+                                color: AppColors.indigoAccent,
+                                fontSize: 10.sp,
+                              ),
+                            ),
+                          ] else if (isPlaying) ...[
+                            Icon(
+                              Icons.stop_circle_rounded,
+                              size: 14.r,
+                              color: AppColors.indigoAccent,
+                            ),
+                            SizedBox(width: 3.w),
+                            Text(
+                              'Stop',
+                              style: AppTypography.caption.copyWith(
+                                color: AppColors.indigoAccent,
+                                fontSize: 10.sp,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ] else ...[
+                            Icon(
+                              Icons.volume_up_outlined,
+                              size: 14.r,
+                              color: AppColors.slateTertiary,
+                            ),
+                            SizedBox(width: 3.w),
+                            Text(
+                              'Listen',
+                              style: AppTypography.caption.copyWith(
+                                color: AppColors.slateTertiary,
+                                fontSize: 10.sp,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: AppSpacing.xs.w),
                 ],
                 Text(
                   timeString,

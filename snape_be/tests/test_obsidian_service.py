@@ -9,7 +9,7 @@ from app.services.obsidian_service import ObsidianService
 
 
 @pytest.mark.asyncio
-async def test_obsidian_service_topics_and_export(tmp_path: Path):
+async def test_obsidian_service_topics_and_export(tmp_path: Path) -> None:
     vault_dir = tmp_path / "vault"
     vault_dir.mkdir()
     topics_dir = vault_dir / "Snape" / "Topics"

@@ -107,6 +107,7 @@ class VoiceCallNotifier extends StateNotifier<VoiceCallState> {
     bool withGreeting = true,
     String? greetingText,
   }) async {
+    chatNotifier.setAutoplayAudio(true);
     final available = await speechService.initialize();
     if (!available) {
       state = state.copyWith(
@@ -305,6 +306,7 @@ class VoiceCallNotifier extends StateNotifier<VoiceCallState> {
   }
 
   Future<void> endCall() async {
+    chatNotifier.setAutoplayAudio(false);
     _silenceTimer?.cancel();
     _restartTimer?.cancel();
     _audioDoneDebounceTimer?.cancel();
@@ -321,6 +323,7 @@ class VoiceCallNotifier extends StateNotifier<VoiceCallState> {
 
   @override
   void dispose() {
+    chatNotifier.setAutoplayAudio(false);
     _silenceTimer?.cancel();
     _restartTimer?.cancel();
     _audioDoneDebounceTimer?.cancel();

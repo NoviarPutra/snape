@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import '../../core/config/app_config.dart';
 import '../../core/constants/api_constants.dart';
@@ -66,6 +67,21 @@ class ChatRemoteDataSource {
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw Exception('Failed to delete session: ${response.statusCode}');
+    }
+  }
+
+  Future<Uint8List> synthesizeAudio(String text) async {
+    final uri = Uri.parse('$_baseHttpUrl/tts/synthesize');
+    final response = await _client.post(
+      uri,
+      headers: AppConfig.defaultHeaders,
+      body: json.encode({'text': text}),
+    );
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return response.bodyBytes;
+    } else {
+      throw Exception('Failed to synthesize audio: ${response.statusCode} ${response.body}');
     }
   }
 }

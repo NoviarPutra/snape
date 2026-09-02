@@ -19,6 +19,9 @@ class ChatState {
   final String currentStreamingId;
   final List<String> lastExtractedMemories;
   final bool isSpeaking;
+  final Map<String, List<Uint8List>> audioBuffers;
+  final String? playingMessageId;
+  final String? loadingAudioMessageId;
 
   const ChatState({
     this.sessionId,
@@ -30,6 +33,9 @@ class ChatState {
     this.currentStreamingId = '',
     this.lastExtractedMemories = const [],
     this.isSpeaking = false,
+    this.audioBuffers = const {},
+    this.playingMessageId,
+    this.loadingAudioMessageId,
   });
 
   bool get isConnected => connectionStatus == ConnectionStatus.connected;
@@ -47,8 +53,13 @@ class ChatState {
     String? currentStreamingId,
     List<String>? lastExtractedMemories,
     bool? isSpeaking,
+    Map<String, List<Uint8List>>? audioBuffers,
+    String? playingMessageId,
+    String? loadingAudioMessageId,
     bool clearError = false,
     bool clearStreamingId = false,
+    bool clearPlayingMessageId = false,
+    bool clearLoadingAudioMessageId = false,
   }) {
     return ChatState(
       sessionId: sessionId ?? this.sessionId,
@@ -63,6 +74,13 @@ class ChatState {
       lastExtractedMemories:
           lastExtractedMemories ?? this.lastExtractedMemories,
       isSpeaking: isSpeaking ?? this.isSpeaking,
+      audioBuffers: audioBuffers ?? this.audioBuffers,
+      playingMessageId: clearPlayingMessageId
+          ? null
+          : (playingMessageId ?? this.playingMessageId),
+      loadingAudioMessageId: clearLoadingAudioMessageId
+          ? null
+          : (loadingAudioMessageId ?? this.loadingAudioMessageId),
     );
   }
 
@@ -77,7 +95,9 @@ class ChatState {
           isStreaming == other.isStreaming &&
           connectionStatus == other.connectionStatus &&
           errorMessage == other.errorMessage &&
-          currentStreamingId == other.currentStreamingId;
+          currentStreamingId == other.currentStreamingId &&
+          playingMessageId == other.playingMessageId &&
+          loadingAudioMessageId == other.loadingAudioMessageId;
 
   @override
   int get hashCode =>
@@ -87,5 +107,7 @@ class ChatState {
       isStreaming.hashCode ^
       connectionStatus.hashCode ^
       errorMessage.hashCode ^
-      currentStreamingId.hashCode;
+      currentStreamingId.hashCode ^
+      playingMessageId.hashCode ^
+      loadingAudioMessageId.hashCode;
 }

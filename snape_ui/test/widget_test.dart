@@ -109,6 +109,95 @@ void main() {
       expect(find.text('Remembered: Prefers IELTS preparation'), findsOneWidget);
       expect(find.text('Remembered: Studies 20 minutes daily'), findsOneWidget);
     });
+
+    testWidgets('renders Listen button on idle assistant message and triggers onPlayAudio',
+        (WidgetTester tester) async {
+      bool playTapped = false;
+      final companionMessage = ChatMessage(
+        id: '4',
+        sessionId: 'sess-1',
+        role: MessageRole.assistant,
+        content: 'Hello, tap to hear me speak.',
+        createdAt: DateTime(2026, 8, 30, 10, 3),
+      );
+
+      await tester.pumpWidget(
+        createTestWrapper(
+          MessageBubble(
+            message: companionMessage,
+            onPlayAudio: () {
+              playTapped = true;
+            },
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Listen'), findsOneWidget);
+      expect(find.byIcon(Icons.volume_up_outlined), findsOneWidget);
+
+      await tester.tap(find.text('Listen'));
+      await tester.pumpAndSettle();
+
+      expect(playTapped, isTrue);
+    });
+
+    testWidgets('renders Stop button on playing assistant message and triggers onStopAudio',
+        (WidgetTester tester) async {
+      bool stopTapped = false;
+      final companionMessage = ChatMessage(
+        id: '5',
+        sessionId: 'sess-1',
+        role: MessageRole.assistant,
+        content: 'Playing message audio now.',
+        createdAt: DateTime(2026, 8, 30, 10, 4),
+      );
+
+      await tester.pumpWidget(
+        createTestWrapper(
+          MessageBubble(
+            message: companionMessage,
+            isPlaying: true,
+            onStopAudio: () {
+              stopTapped = true;
+            },
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Stop'), findsOneWidget);
+      expect(find.byIcon(Icons.stop_circle_rounded), findsOneWidget);
+
+      await tester.tap(find.text('Stop'));
+      await tester.pumpAndSettle();
+
+      expect(stopTapped, isTrue);
+    });
+
+    testWidgets('renders loading indicator when assistant message audio is synthesizing',
+        (WidgetTester tester) async {
+      final companionMessage = ChatMessage(
+        id: '6',
+        sessionId: 'sess-1',
+        role: MessageRole.assistant,
+        content: 'Fetching on-demand speech.',
+        createdAt: DateTime(2026, 8, 30, 10, 5),
+      );
+
+      await tester.pumpWidget(
+        createTestWrapper(
+          MessageBubble(
+            message: companionMessage,
+            isLoadingAudio: true,
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('Loading...'), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    });
   });
 
   group('ChatInputBar Widget', () {

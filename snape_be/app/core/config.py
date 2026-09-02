@@ -54,7 +54,7 @@ class Settings(BaseSettings):
     # TTS Settings
     ENABLE_TTS: bool = True
     TTS_PROVIDER: str = "edge_tts"
-    EDGE_TTS_VOICE: str = "en-US-ChristopherNeural"
+    EDGE_TTS_VOICE: str = "en-US-AndrewMultilingualNeural"
     POCKET_TTS_VOICE: str = "af_sky"
     POCKET_TTS_DEVICE: str = "cpu"
 

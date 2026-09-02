@@ -259,9 +259,19 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         itemCount: chatState.messages.length,
                         itemBuilder: (context, index) {
                           final message = chatState.messages[index];
+                          final isPlaying = chatState.playingMessageId == message.id && chatState.isSpeaking;
+                          final isLoadingAudio = chatState.loadingAudioMessageId == message.id;
                           return MessageBubble(
                             key: ValueKey(message.id),
                             message: message,
+                            isPlaying: isPlaying,
+                            isLoadingAudio: isLoadingAudio,
+                            onPlayAudio: () {
+                              ref.read(chatProvider.notifier).playMessageAudio(message.id, message.content);
+                            },
+                            onStopAudio: () {
+                              ref.read(chatProvider.notifier).stopAudio();
+                            },
                           );
                         },
                       ),

@@ -69,6 +69,9 @@ class FakeChatRepository implements ChatRepository {
   Future<void> deleteSession(String sessionId) async {}
 
   @override
+  Future<Uint8List> synthesizeAudio(String text) async => Uint8List.fromList([1, 2, 3]);
+
+  @override
   Future<void> connectToChatStream(String sessionId) async {
     connected = true;
     _connectionController.add(true);

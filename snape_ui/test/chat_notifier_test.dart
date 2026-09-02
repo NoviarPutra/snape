@@ -48,6 +48,11 @@ class FakeChatRepository implements ChatRepository {
   Future<void> deleteSession(String sessionId) async {}
 
   @override
+  Future<Uint8List> synthesizeAudio(String text) async {
+    return Uint8List.fromList([1, 2, 3, 4]);
+  }
+
+  @override
   Future<void> connectToChatStream(String sessionId) async {
     connected = true;
     _connectionController.add(true);
@@ -77,7 +82,7 @@ class FakeChatRepository implements ChatRepository {
     _eventController.add(event);
   }
 
-  void emitConnection(bool isConnected) {
+  void emitConnectionStatus(bool isConnected) {
     connected = isConnected;
     _connectionController.add(isConnected);
   }
@@ -90,8 +95,7 @@ class FakeChatRepository implements ChatRepository {
 }
 
 class FakeAudioPlayerAdapter implements AudioPlayerAdapter {
-  final StreamController<void> _completeController =
-      StreamController<void>.broadcast();
+  final _completeController = StreamController<void>.broadcast();
   final List<Uint8List> playedChunks = [];
   bool isStopped = false;
 
@@ -120,58 +124,68 @@ class FakeAudioPlayerAdapter implements AudioPlayerAdapter {
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('ChatNotifier State Management', () {
     late FakeChatRepository repository;
     late FakeAudioPlayerAdapter audioAdapter;
-    late AudioQueueService audioQueue;
+    late AudioQueueService audioService;
     late ChatNotifier notifier;
 
     setUp(() {
       repository = FakeChatRepository();
       audioAdapter = FakeAudioPlayerAdapter();
-      audioQueue = AudioQueueService(playerAdapter: audioAdapter);
-      notifier = ChatNotifier(repository, audioQueue);
+      audioService = AudioQueueService(playerAdapter: audioAdapter);
+      notifier = ChatNotifier(repository, audioService);
     });
 
-    tearDown(() async {
+    tearDown(() {
       notifier.dispose();
       repository.dispose();
-      await audioQueue.dispose();
+      audioService.dispose();
     });
 
     test('initial state is disconnected with empty messages', () {
-      expect(notifier.state.messages, isEmpty);
       expect(notifier.state.connectionStatus, ConnectionStatus.disconnected);
-      expect(notifier.state.isSpeaking, isFalse);
+      expect(notifier.state.messages, isEmpty);
+      expect(notifier.state.sessionId, isNull);
     });
 
     test('switchSession loads history and connects to websocket stream', () async {
-      repository.mockHistory = [
+      final mockMessages = [
         ChatMessage(
-          id: 'hist-1',
+          id: 'msg-1',
           sessionId: 'sess-1',
           role: MessageRole.user,
-          content: 'Previous conversation',
+          content: 'Hello',
+          createdAt: DateTime.now(),
+        ),
+        ChatMessage(
+          id: 'msg-2',
+          sessionId: 'sess-1',
+          role: MessageRole.assistant,
+          content: 'Hi there!',
           createdAt: DateTime.now(),
         ),
       ];
+      repository.mockHistory = mockMessages;
 
       await notifier.switchSession('sess-1');
 
       expect(notifier.state.sessionId, 'sess-1');
-      expect(notifier.state.messages.length, 1);
-      expect(notifier.state.messages.first.content, 'Previous conversation');
+      expect(notifier.state.messages.length, 2);
+      expect(notifier.state.isLoadingHistory, isFalse);
       expect(notifier.state.connectionStatus, ConnectionStatus.connected);
     });
 
     test('sendMessage creates user message and streaming assistant placeholder', () async {
       await notifier.switchSession('sess-1');
-      await notifier.sendMessage('Hello Snape!');
+      await notifier.sendMessage('How are you?');
 
-      expect(repository.sentMessages, contains('Hello Snape!'));
       expect(notifier.state.messages.length, 2);
-      expect(notifier.state.messages[0].isUser, isTrue);
-      expect(notifier.state.messages[0].content, 'Hello Snape!');
+      final userMsg = notifier.state.messages[0];
+      expect(userMsg.isUser, isTrue);
+      expect(userMsg.content, 'How are you?');
 
       final assistantMsg = notifier.state.messages[1];
       expect(assistantMsg.isAssistant, isTrue);
@@ -196,8 +210,27 @@ void main() {
       expect(notifier.state.isStreaming, isTrue);
     });
 
-    test('audio event triggers queue playback and updates isSpeaking', () async {
+    test('audio event buffers audio in memory and does not autoplay in text chat mode', () async {
       await notifier.switchSession('sess-1');
+      await notifier.sendMessage('Hello');
+      final streamingId = notifier.state.currentStreamingId;
+      final dummyAudio = base64Encode(Uint8List.fromList([1, 2, 3, 4]));
+
+      repository.emitEvent(WSAudioEvent(
+        sentence: 'Hello there',
+        audioBase64: dummyAudio,
+      ));
+      await Future<void>.delayed(Duration.zero);
+
+      // In text chat mode, audio is buffered for on-demand playback, not sent directly to speaker
+      expect(audioAdapter.playedChunks.length, 0);
+      expect(notifier.state.audioBuffers.containsKey(streamingId), isTrue);
+      expect(notifier.state.audioBuffers[streamingId]!.length, 1);
+    });
+
+    test('audio event autoplays when autoplayAudio is enabled (Voice Call mode)', () async {
+      await notifier.switchSession('sess-1');
+      notifier.setAutoplayAudio(true);
       final dummyAudio = base64Encode(Uint8List.fromList([1, 2, 3, 4]));
 
       repository.emitEvent(WSAudioEvent(
@@ -215,22 +248,63 @@ void main() {
       expect(notifier.state.isSpeaking, isFalse);
     });
 
-    test('barge-in: sending new message stops playing audio', () async {
+    test('playMessageAudio plays from buffered audio if available', () async {
       await notifier.switchSession('sess-1');
-      final dummyAudio = base64Encode(Uint8List.fromList([1, 2, 3, 4]));
+      await notifier.sendMessage('Hello');
+      final dummyAudio = base64Encode(Uint8List.fromList([5, 6, 7, 8]));
 
       repository.emitEvent(WSAudioEvent(
         sentence: 'Hello there',
         audioBase64: dummyAudio,
       ));
+      repository.emitEvent(WSDoneEvent(
+        sessionId: 'sess-1',
+        fullText: 'Hello there',
+        assistantMessageId: 'asst-msg-123',
+      ));
       await Future<void>.delayed(Duration.zero);
+
+      expect(notifier.state.audioBuffers.containsKey('asst-msg-123'), isTrue);
+
+      await notifier.playMessageAudio('asst-msg-123', 'Hello there');
+
+      expect(audioAdapter.playedChunks.length, 1);
+      expect(notifier.state.playingMessageId, 'asst-msg-123');
       expect(notifier.state.isSpeaking, isTrue);
+    });
+
+    test('playMessageAudio synthesizes on-demand from API for unbuffered historical message', () async {
+      await notifier.switchSession('sess-1');
+
+      await notifier.playMessageAudio('historical-msg-1', 'This is a historical message');
+
+      expect(audioAdapter.playedChunks.length, 1);
+      expect(notifier.state.playingMessageId, 'historical-msg-1');
+      expect(notifier.state.audioBuffers.containsKey('historical-msg-1'), isTrue);
+    });
+
+    test('stopAudio halts playback and resets playingMessageId', () async {
+      await notifier.switchSession('sess-1');
+      await notifier.playMessageAudio('msg-1', 'Some message');
+
+      expect(notifier.state.playingMessageId, 'msg-1');
+
+      notifier.stopAudio();
+
+      expect(audioAdapter.isStopped, isTrue);
+      expect(notifier.state.playingMessageId, isNull);
+    });
+
+    test('barge-in: sending new message stops playing audio', () async {
+      await notifier.switchSession('sess-1');
+      await notifier.playMessageAudio('msg-1', 'Some message');
+      expect(notifier.state.playingMessageId, 'msg-1');
 
       // Barge in with new message
       await notifier.sendMessage('Interrupting with new question!');
 
       expect(audioAdapter.isStopped, isTrue);
-      expect(notifier.state.isSpeaking, isFalse);
+      expect(notifier.state.playingMessageId, isNull);
     });
 
     test('done event finalizes assistant message with extracted memories and sets isStreaming to false', () async {
@@ -264,7 +338,7 @@ void main() {
       await notifier.sendMessage('Second turn');
 
       expect(notifier.state.messages[1].isStreaming, isFalse);
-      expect(notifier.state.messages[1].content, 'Message interrupted');
+      expect(notifier.state.messages[1].content, 'Response was interrupted. Please send again.');
       expect(notifier.state.messages[3].isStreaming, isTrue);
     });
 

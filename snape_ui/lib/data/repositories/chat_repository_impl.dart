@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import '../../domain/models/chat_message.dart';
 import '../../domain/models/session.dart';
 import '../../domain/repositories/chat_repository.dart';
@@ -33,6 +35,11 @@ class ChatRepositoryImpl implements ChatRepository {
   @override
   Future<void> deleteSession(String sessionId) {
     return _remoteDataSource.deleteSession(sessionId);
+  }
+
+  @override
+  Future<Uint8List> synthesizeAudio(String text) {
+    return _remoteDataSource.synthesizeAudio(text);
   }
 
   @override

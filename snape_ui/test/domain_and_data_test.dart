@@ -1,5 +1,12 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:snape_ui/data/datasources/chat_remote_data_source.dart';
 import 'package:snape_ui/data/models/websocket_events.dart';
+import 'package:snape_ui/data/repositories/chat_repository_impl.dart';
 import 'package:snape_ui/domain/models/chat_message.dart';
 import 'package:snape_ui/domain/models/memory_item.dart';
 import 'package:snape_ui/domain/models/session.dart';
@@ -118,6 +125,35 @@ void main() {
       final event = WSOutputEvent.fromJson(json);
       expect(event, isA<WSErrorEvent>());
       expect((event as WSErrorEvent).message, 'Session expired');
+    });
+  });
+
+  group('TTS On-Demand Synthesis Data & Repo', () {
+    test('ChatRemoteDataSource.synthesizeAudio returns audio bytes on 200', () async {
+      final expectedBytes = Uint8List.fromList([1, 2, 3, 4, 5]);
+      final mockClient = MockClient((request) async {
+        expect(request.url.path, contains('/tts/synthesize'));
+        expect(request.method, 'POST');
+        final body = json.decode(request.body) as Map<String, dynamic>;
+        expect(body['text'], 'Hello world');
+        return http.Response.bytes(expectedBytes, 200);
+      });
+
+      final dataSource = ChatRemoteDataSource(client: mockClient, baseHttpUrl: 'https://test.api/api/v1');
+      final result = await dataSource.synthesizeAudio('Hello world');
+      expect(result, expectedBytes);
+    });
+
+    test('ChatRepositoryImpl.synthesizeAudio delegates to remote data source', () async {
+      final expectedBytes = Uint8List.fromList([10, 20, 30]);
+      final mockClient = MockClient((request) async {
+        return http.Response.bytes(expectedBytes, 200);
+      });
+
+      final dataSource = ChatRemoteDataSource(client: mockClient, baseHttpUrl: 'https://test.api/api/v1');
+      final repo = ChatRepositoryImpl(remoteDataSource: dataSource);
+      final result = await repo.synthesizeAudio('Practice English');
+      expect(result, expectedBytes);
     });
   });
 }

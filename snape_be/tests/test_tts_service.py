@@ -64,8 +64,13 @@ def test_get_tts_provider_factory() -> None:
 
 @pytest.mark.asyncio
 async def test_edge_tts_provider_synthesize() -> None:
-    provider = EdgeTTSProvider(voice="en-US-ChristopherNeural")
+    provider = EdgeTTSProvider(voice="en-US-AndrewMultilingualNeural")
     assert isinstance(provider, BaseTTSProvider)
 
     audio_bytes = await provider.synthesize("Hello friend, welcome to Snape!")
     assert len(audio_bytes) > 0
+
+    multilingual_audio = await provider.synthesize(
+        "That means 'kamu sangat luar biasa' in Indonesian."
+    )
+    assert len(multilingual_audio) > 0

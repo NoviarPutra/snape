@@ -95,7 +95,7 @@ class EdgeTTSProvider(BaseTTSProvider):
 
     def __init__(
         self,
-        voice: str = "en-US-ChristopherNeural",
+        voice: str = "en-US-AndrewMultilingualNeural",
         sample_rate: int = 24000,
     ) -> None:
         self.voice = voice

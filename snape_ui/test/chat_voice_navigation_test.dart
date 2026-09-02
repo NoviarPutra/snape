@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -99,6 +100,9 @@ class FakeChatRepository implements ChatRepository {
 
   @override
   Future<void> deleteSession(String sessionId) async {}
+
+  @override
+  Future<Uint8List> synthesizeAudio(String text) async => Uint8List.fromList([1, 2, 3]);
 
   @override
   Future<void> connectToChatStream(String sessionId) async {

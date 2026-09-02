@@ -8,6 +8,7 @@ from app.schemas.session import (
     SessionResponse,
     SessionUpdate,
 )
+from app.schemas.tts import TTSSynthesizeRequest
 from app.schemas.user import UserBase, UserCreate, UserResponse, UserUpdate
 
 __all__ = [
@@ -28,4 +29,5 @@ __all__ = [
     "MemoryCreate",
     "MemoryResponse",
     "MemoryQueryResult",
+    "TTSSynthesizeRequest",
 ]
