@@ -50,7 +50,7 @@ async def test_user_service_operations(db_session: AsyncSession) -> None:
 async def test_session_service_operations(db_session: AsyncSession) -> None:
     user = await user_service.get_or_create_default_user(db_session)
 
-    # 1. Create session
+    # 1. Create session with explicit title and default space_slug
     session = await session_service.create_session(
         db_session,
         user_id=user.id,
@@ -58,11 +58,47 @@ async def test_session_service_operations(db_session: AsyncSession) -> None:
     )
     assert session.id is not None
     assert session.title == "Daily English Practice"
+    assert session.space_slug == "english_b2"
 
-    # 2. List sessions
-    sessions = await session_service.list_sessions(db_session, user_id=user.id)
-    assert len(sessions) == 1
-    assert sessions[0].id == session.id
+    # Create session with omitted title (should default to Space display name)
+    session_default_b2 = await session_service.create_session(
+        db_session,
+        user_id=user.id,
+        session_in=SessionCreate(),
+    )
+    assert session_default_b2.title == "B2 – Conversational"
+    assert session_default_b2.space_slug == "english_b2"
+
+    # Create session with space_slug="tech" and omitted title
+    session_tech = await session_service.create_session(
+        db_session,
+        user_id=user.id,
+        session_in=SessionCreate(space_slug="tech"),
+    )
+    assert session_tech.title == "Teknologi"
+    assert session_tech.space_slug == "tech"
+
+    # 2. List sessions (all, and filtered by space_slug)
+    all_sessions = await session_service.list_sessions(db_session, user_id=user.id)
+    assert len(all_sessions) == 3
+
+    b2_sessions = await session_service.list_sessions(
+        db_session, user_id=user.id, space_slug="english_b2"
+    )
+    assert len(b2_sessions) == 2
+    assert all(s.space_slug == "english_b2" for s in b2_sessions)
+
+    tech_sessions = await session_service.list_sessions(
+        db_session, user_id=user.id, space_slug="tech"
+    )
+    assert len(tech_sessions) == 1
+    assert tech_sessions[0].id == session_tech.id
+    assert tech_sessions[0].space_slug == "tech"
+
+    psych_sessions = await session_service.list_sessions(
+        db_session, user_id=user.id, space_slug="psychology"
+    )
+    assert len(psych_sessions) == 0
 
     # 3. Add messages
     msg1 = await session_service.add_message(

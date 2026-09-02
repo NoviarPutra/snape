@@ -51,7 +51,7 @@ async def test_user_endpoints(client: AsyncClient) -> None:
 @pytest.mark.asyncio
 async def test_session_lifecycle_endpoints(client: AsyncClient) -> None:
     """Test session CRUD REST endpoints."""
-    # 1. Create a session
+    # 1. Create a session with default space_slug (english_b2)
     create_res = await client.post(
         "/api/v1/sessions",
         json={"title": "Weekend Practice"},
@@ -60,13 +60,39 @@ async def test_session_lifecycle_endpoints(client: AsyncClient) -> None:
     session_data = create_res.json()
     session_id = session_data["id"]
     assert session_data["title"] == "Weekend Practice"
+    assert session_data["space_slug"] == "english_b2"
 
-    # 2. List sessions
+    # Create a session with explicit space_slug and omitted title
+    create_tech_res = await client.post(
+        "/api/v1/sessions",
+        json={"space_slug": "tech"},
+    )
+    assert create_tech_res.status_code == 201
+    tech_data = create_tech_res.json()
+    assert tech_data["title"] == "Teknologi"
+    assert tech_data["space_slug"] == "tech"
+
+    # 2. List sessions without filter
     list_res = await client.get("/api/v1/sessions")
     assert list_res.status_code == 200
     sessions = list_res.json()
-    assert len(sessions) >= 1
+    assert len(sessions) >= 2
     assert any(s["id"] == session_id for s in sessions)
+    assert any(s["id"] == tech_data["id"] for s in sessions)
+
+    # List sessions filtered by space_slug=tech
+    list_tech_res = await client.get("/api/v1/sessions?space_slug=tech")
+    assert list_tech_res.status_code == 200
+    tech_sessions = list_tech_res.json()
+    assert len(tech_sessions) == 1
+    assert tech_sessions[0]["id"] == tech_data["id"]
+    assert tech_sessions[0]["space_slug"] == "tech"
+
+    # List sessions filtered by space_slug=english_b2
+    list_b2_res = await client.get("/api/v1/sessions?space_slug=english_b2")
+    assert list_b2_res.status_code == 200
+    b2_sessions = list_b2_res.json()
+    assert all(s["space_slug"] == "english_b2" for s in b2_sessions)
 
     # 3. Get session detail
     detail_res = await client.get(f"/api/v1/sessions/{session_id}")
@@ -74,6 +100,7 @@ async def test_session_lifecycle_endpoints(client: AsyncClient) -> None:
     detail = detail_res.json()
     assert detail["id"] == session_id
     assert detail["title"] == "Weekend Practice"
+    assert detail["space_slug"] == "english_b2"
     assert "messages" in detail
     assert isinstance(detail["messages"], list)
 
@@ -92,6 +119,16 @@ async def test_session_lifecycle_endpoints(client: AsyncClient) -> None:
     # 6. Verify deleted session gives 404
     get_deleted = await client.get(f"/api/v1/sessions/{session_id}")
     assert get_deleted.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_create_session_unknown_space_slug_returns_422(client: AsyncClient) -> None:
+    """Test session creation fails with 422 for invalid space_slug."""
+    response = await client.post(
+        "/api/v1/sessions",
+        json={"space_slug": "invalid_space_xyz"},
+    )
+    assert response.status_code == 422
 
 
 @pytest.mark.asyncio

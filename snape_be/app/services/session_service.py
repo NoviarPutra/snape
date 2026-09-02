@@ -4,22 +4,24 @@ from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.space_config import get_space_config
 from app.db.models import ChatMessage, ChatSession
 from app.schemas.message import MessageCreate
 from app.schemas.session import SessionCreate, SessionUpdate
 
 
 async def list_sessions(
-    db: AsyncSession, user_id: UUID, limit: int = 50, offset: int = 0
+    db: AsyncSession,
+    user_id: UUID,
+    space_slug: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
 ) -> list[ChatSession]:
-    """Retrieve chat sessions for a specific user, ordered by most recently updated."""
-    stmt = (
-        select(ChatSession)
-        .where(ChatSession.user_id == user_id)
-        .order_by(desc(ChatSession.updated_at))
-        .offset(offset)
-        .limit(limit)
-    )
+    """Retrieve chat sessions for a user, optionally filtered by space_slug."""
+    stmt = select(ChatSession).where(ChatSession.user_id == user_id)
+    if space_slug is not None:
+        stmt = stmt.where(ChatSession.space_slug == space_slug)
+    stmt = stmt.order_by(desc(ChatSession.updated_at)).offset(offset).limit(limit)
     result = await db.execute(stmt)
     return list(result.scalars().all())
 
@@ -37,9 +39,16 @@ async def get_session_by_id(
 
 async def create_session(db: AsyncSession, user_id: UUID, session_in: SessionCreate) -> ChatSession:
     """Create a new chat session."""
+    space = get_space_config(session_in.space_slug)
+    title = (
+        session_in.title.strip()
+        if session_in.title and session_in.title.strip()
+        else space.display_name
+    )
     session = ChatSession(
         user_id=user_id,
-        title=session_in.title or "Casual English Chat",
+        title=title,
+        space_slug=session_in.space_slug,
     )
     db.add(session)
     await db.flush()

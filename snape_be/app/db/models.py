@@ -59,6 +59,13 @@ class ChatSession(Base, TimestampMixin):
         default="Casual English Chat",
         nullable=False,
     )
+    space_slug: Mapped[str] = mapped_column(
+        String(32),
+        default="english_b2",
+        server_default="english_b2",
+        nullable=False,
+        index=True,
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=func.now(),
@@ -77,7 +84,10 @@ class ChatSession(Base, TimestampMixin):
     )
 
     def __repr__(self) -> str:
-        return f"<ChatSession id={self.id} user_id={self.user_id} title={self.title}>"
+        return (
+            f"<ChatSession id={self.id} user_id={self.user_id} "
+            f"title={self.title} space_slug={self.space_slug}>"
+        )
 
 
 class ChatMessage(Base, TimestampMixin):

@@ -32,6 +32,20 @@ async def test_user_creation_and_relations(db_session: AsyncSession) -> None:
 
     assert session.id is not None
     assert session.user_id == user.id
+    assert session.space_slug == "english_b2"
+
+    # Create ChatSession with explicit space_slug
+    tech_session = ChatSession(
+        user_id=user.id,
+        title="Tech Discussion",
+        space_slug="tech",
+    )
+    db_session.add(tech_session)
+    await db_session.commit()
+    await db_session.refresh(tech_session)
+
+    assert tech_session.id is not None
+    assert tech_session.space_slug == "tech"
 
     # Create ChatMessage
     message = ChatMessage(

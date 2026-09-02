@@ -19,13 +19,16 @@ router = APIRouter(prefix="/sessions", tags=["Sessions"])
 
 @router.get("", response_model=list[SessionResponse])
 async def list_user_sessions(
+    space_slug: str | None = Query(default=None, description="Filter sessions by space slug"),
     limit: int = Query(default=50, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     db: AsyncSession = Depends(get_db),
 ) -> list[SessionResponse]:
-    """Retrieve all chat sessions for the current user."""
+    """Retrieve all chat sessions for the current user, optionally filtered by space."""
     user = await user_service.get_or_create_default_user(db)
-    sessions = await session_service.list_sessions(db, user_id=user.id, limit=limit, offset=offset)
+    sessions = await session_service.list_sessions(
+        db, user_id=user.id, space_slug=space_slug, limit=limit, offset=offset
+    )
     return [SessionResponse.model_validate(s) for s in sessions]
 
 
