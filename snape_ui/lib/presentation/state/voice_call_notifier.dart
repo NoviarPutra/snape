@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/services/audio_queue_service.dart';
 import '../../core/services/speech_service.dart';
 import 'chat_notifier.dart';
@@ -29,6 +30,12 @@ class VoiceCallNotifier extends StateNotifier<VoiceCallState> {
     this.audioQueueService,
     this.silenceDuration = const Duration(milliseconds: 2200),
   }) : super(const VoiceCallState()) {
+    SharedPreferences.getInstance().then((prefs) {
+      final saved = prefs.getString('stt_locale') ?? 'id_ID';
+      if (saved != state.localeId && mounted) {
+        state = state.copyWith(localeId: saved);
+      }
+    });
     _initSubscriptions();
   }
 
@@ -278,6 +285,9 @@ class VoiceCallNotifier extends StateNotifier<VoiceCallState> {
   Future<void> toggleLanguage() async {
     final newLocale = state.localeId == 'en_US' ? 'id_ID' : 'en_US';
     state = state.copyWith(localeId: newLocale);
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setString('stt_locale', newLocale);
+    });
 
     if (state.phase == VoiceCallPhase.listening && !state.isMuted) {
       await speechService.stopListening();
@@ -324,14 +334,14 @@ class VoiceCallNotifier extends StateNotifier<VoiceCallState> {
   @override
   void dispose() {
     chatNotifier.setAutoplayAudio(false);
-    _silenceTimer?.cancel();
-    _restartTimer?.cancel();
-    _audioDoneDebounceTimer?.cancel();
-    _isDispatching = false;
     _isSpeakingSubscription?.cancel();
     _chatRemoveListener?.call();
     speechService.stopListening();
     audioQueueService?.stopAndClear();
+    _silenceTimer?.cancel();
+    _restartTimer?.cancel();
+    _audioDoneDebounceTimer?.cancel();
+    _isDispatching = false;
     super.dispose();
   }
 }

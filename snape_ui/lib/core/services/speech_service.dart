@@ -6,7 +6,7 @@ abstract class BaseSpeechService {
   Future<void> startListening({
     required Function(String text, bool isFinal) onResult,
     Function(bool isListening)? onListeningStateChanged,
-    String localeId = 'en_US',
+    String localeId = 'id_ID',
   });
   Future<void> stopListening();
   bool get isListening;
@@ -65,7 +65,7 @@ class SpeechService implements BaseSpeechService {
   Future<void> startListening({
     required Function(String text, bool isFinal) onResult,
     Function(bool isListening)? onListeningStateChanged,
-    String localeId = 'en_US',
+    String localeId = 'id_ID',
     stt.ListenMode listenMode = stt.ListenMode.dictation,
     Duration pauseFor = const Duration(seconds: 4),
   }) async {

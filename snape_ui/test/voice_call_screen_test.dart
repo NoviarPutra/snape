@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:snape_ui/core/services/audio_queue_service.dart';
 import 'package:snape_ui/core/services/speech_service.dart';
 import 'package:snape_ui/core/theme/app_theme.dart';
 import 'package:snape_ui/data/models/websocket_events.dart';
@@ -17,10 +19,29 @@ import 'package:snape_ui/presentation/widgets/voice_control_bar.dart';
 import 'package:snape_ui/presentation/widgets/voice_orb_visualizer.dart';
 import 'package:snape_ui/presentation/widgets/voice_subtitle_card.dart';
 
+class MockAudioPlayerAdapter implements AudioPlayerAdapter {
+  final StreamController<void> _completeController =
+      StreamController<void>.broadcast();
+
+  @override
+  Stream<void> get onPlayerComplete => _completeController.stream;
+
+  @override
+  Future<void> playBytes(Uint8List bytes, {String? mimeType}) async {}
+
+  @override
+  Future<void> stop() async {}
+
+  @override
+  Future<void> dispose() async {
+    await _completeController.close();
+  }
+}
+
 class MockSpeechService implements BaseSpeechService {
   bool _isAvailable = true;
   bool _isListening = false;
-  String currentLocale = 'en_US';
+  String currentLocale = 'id_ID';
   Function(String text, bool isFinal)? onResultCallback;
   Function(bool isListening)? onListeningStateChanged;
 
@@ -39,7 +60,7 @@ class MockSpeechService implements BaseSpeechService {
   Future<void> startListening({
     required Function(String text, bool isFinal) onResult,
     Function(bool isListening)? onListeningStateChanged,
-    String localeId = 'en_US',
+    String localeId = 'id_ID',
   }) async {
     _isListening = true;
     currentLocale = localeId;
@@ -131,13 +152,18 @@ class FakeChatRepository implements ChatRepository {
 Widget createVoiceCallScreenTestWrapper({
   required BaseSpeechService speechService,
   required ChatRepository chatRepository,
+  AudioQueueService? audioQueueService,
   VoiceCallNotifier? customVoiceNotifier,
   NavigatorObserver? navigatorObserver,
 }) {
+  final effectiveAudioQueue = audioQueueService ??
+      AudioQueueService(playerAdapter: MockAudioPlayerAdapter());
+
   return ProviderScope(
     overrides: [
       speechServiceProvider.overrideWithValue(speechService),
       chatRepositoryProvider.overrideWithValue(chatRepository),
+      audioQueueServiceProvider.overrideWithValue(effectiveAudioQueue),
       if (customVoiceNotifier != null)
         voiceCallProvider.overrideWith((ref) => customVoiceNotifier),
     ],
@@ -160,6 +186,7 @@ void main() {
     late FakeChatRepository mockChatRepo;
 
     setUp(() {
+      SharedPreferences.setMockInitialValues({});
       mockSpeechService = MockSpeechService();
       mockChatRepo = FakeChatRepository();
     });
@@ -179,6 +206,8 @@ void main() {
       expect(find.byType(VoiceSubtitleCard), findsOneWidget);
       expect(find.byType(VoiceControlBar), findsOneWidget);
       expect(find.byKey(const Key('voice_call_close_button')), findsOneWidget);
+
+      await tester.pumpWidget(const SizedBox());
     });
 
     testWidgets('triggers proactive greeting upon entering screen', (WidgetTester tester) async {
@@ -192,6 +221,8 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
 
       expect(find.text("Hey there! It's great to hear from you. What's on your mind today?"), findsOneWidget);
+
+      await tester.pumpWidget(const SizedBox());
     });
 
     testWidgets('controls toggle mute, language, subtitles, and end call', (WidgetTester tester) async {
@@ -210,9 +241,10 @@ void main() {
       expect(find.byIcon(Icons.mic_off_rounded), findsOneWidget);
 
       // Toggle Language
+      expect(find.text('ID'), findsOneWidget);
       await tester.tap(find.byKey(const Key('voice_control_language_button')));
       await tester.pump(const Duration(milliseconds: 100));
-      expect(find.text('ID'), findsOneWidget);
+      expect(find.text('EN'), findsOneWidget);
 
       // Toggle Subtitles
       await tester.tap(find.byKey(const Key('voice_control_subtitles_button')));

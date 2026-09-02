@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:snape_ui/core/services/audio_queue_service.dart';
 import 'package:snape_ui/core/services/speech_service.dart';
 import 'package:snape_ui/data/models/websocket_events.dart';
@@ -111,7 +112,7 @@ class FakeChatRepository implements ChatRepository {
 class MockSpeechService implements BaseSpeechService {
   bool _isAvailable = true;
   bool _isListening = false;
-  String currentLocale = 'en_US';
+  String currentLocale = 'id_ID';
   Function(String text, bool isFinal)? onResultCallback;
   Function(bool isListening)? onListeningStateChanged;
 
@@ -130,7 +131,7 @@ class MockSpeechService implements BaseSpeechService {
   Future<void> startListening({
     required Function(String text, bool isFinal) onResult,
     Function(bool isListening)? onListeningStateChanged,
-    String localeId = 'en_US',
+    String localeId = 'id_ID',
   }) async {
     _isListening = true;
     currentLocale = localeId;
@@ -166,6 +167,7 @@ void main() {
     late VoiceCallNotifier voiceNotifier;
 
     setUp(() async {
+      SharedPreferences.setMockInitialValues({});
       mockChatRepo = FakeChatRepository();
       mockPlayerAdapter = MockAudioPlayerAdapter();
       audioQueueService = AudioQueueService(playerAdapter: mockPlayerAdapter);
@@ -190,7 +192,7 @@ void main() {
 
     test('initial state is idle with defaults', () {
       expect(voiceNotifier.state.phase, VoiceCallPhase.idle);
-      expect(voiceNotifier.state.localeId, 'en_US');
+      expect(voiceNotifier.state.localeId, 'id_ID');
       expect(voiceNotifier.state.isMuted, isFalse);
       expect(voiceNotifier.state.showSubtitles, isTrue);
       expect(voiceNotifier.state.userSpeech, isEmpty);
@@ -338,17 +340,34 @@ void main() {
       expect(mockPlayerAdapter.isStopped, isTrue);
     });
 
-    test('toggleLanguage switches between en_US and id_ID and updates STT locale', () async {
+    test('toggleLanguage switches between id_ID and en_US, updates STT locale, and persists', () async {
       await voiceNotifier.startCall(withGreeting: false);
-      expect(voiceNotifier.state.localeId, 'en_US');
-
-      await voiceNotifier.toggleLanguage();
       expect(voiceNotifier.state.localeId, 'id_ID');
       expect(mockSpeechService.currentLocale, 'id_ID');
 
       await voiceNotifier.toggleLanguage();
       expect(voiceNotifier.state.localeId, 'en_US');
       expect(mockSpeechService.currentLocale, 'en_US');
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('stt_locale'), 'en_US');
+
+      await voiceNotifier.toggleLanguage();
+      expect(voiceNotifier.state.localeId, 'id_ID');
+      expect(mockSpeechService.currentLocale, 'id_ID');
+      expect(prefs.getString('stt_locale'), 'id_ID');
+    });
+
+    test('loads persisted stt_locale from SharedPreferences on initialization', () async {
+      SharedPreferences.setMockInitialValues({'stt_locale': 'en_US'});
+      final notifier = VoiceCallNotifier(
+        chatNotifier: chatNotifier,
+        speechService: mockSpeechService,
+        audioQueueService: audioQueueService,
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(notifier.state.localeId, 'en_US');
+      notifier.dispose();
     });
 
     test('toggleMute silences and resumes speech listening', () async {

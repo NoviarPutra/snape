@@ -20,7 +20,7 @@ class VoiceCallState {
 
   const VoiceCallState({
     this.phase = VoiceCallPhase.idle,
-    this.localeId = 'en_US',
+    this.localeId = 'id_ID',
     this.isMuted = false,
     this.showSubtitles = true,
     this.userSpeech = '',

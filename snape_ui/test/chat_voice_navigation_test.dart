@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:snape_ui/core/services/audio_queue_service.dart';
 import 'package:snape_ui/core/services/speech_service.dart';
 import 'package:snape_ui/core/theme/app_theme.dart';
 import 'package:snape_ui/data/models/websocket_events.dart';
@@ -21,7 +23,7 @@ import 'package:snape_ui/presentation/widgets/message_bubble.dart';
 class MockSpeechService implements BaseSpeechService {
   bool _isAvailable = true;
   bool _isListening = false;
-  String currentLocale = 'en_US';
+  String currentLocale = 'id_ID';
   Function(String text, bool isFinal)? onResultCallback;
   Function(bool isListening)? onListeningStateChanged;
 
@@ -40,7 +42,7 @@ class MockSpeechService implements BaseSpeechService {
   Future<void> startListening({
     required Function(String text, bool isFinal) onResult,
     Function(bool isListening)? onListeningStateChanged,
-    String localeId = 'en_US',
+    String localeId = 'id_ID',
   }) async {
     _isListening = true;
     currentLocale = localeId;
@@ -141,6 +143,25 @@ class FakeChatRepository implements ChatRepository {
   }
 }
 
+class MockAudioPlayerAdapter implements AudioPlayerAdapter {
+  final StreamController<void> _completeController =
+      StreamController<void>.broadcast();
+
+  @override
+  Stream<void> get onPlayerComplete => _completeController.stream;
+
+  @override
+  Future<void> playBytes(Uint8List bytes, {String? mimeType}) async {}
+
+  @override
+  Future<void> stop() async {}
+
+  @override
+  Future<void> dispose() async {
+    await _completeController.close();
+  }
+}
+
 class FakeMemoryRepository implements MemoryRepository {
   @override
   Future<List<MemoryItem>> getMemories({int limit = 50, int offset = 0, String? category}) async {
@@ -159,6 +180,9 @@ Widget createTestApp({
     overrides: [
       chatRepositoryProvider.overrideWithValue(chatRepo),
       speechServiceProvider.overrideWithValue(speechService),
+      audioQueueServiceProvider.overrideWithValue(
+        AudioQueueService(playerAdapter: MockAudioPlayerAdapter()),
+      ),
       memoryRepositoryProvider.overrideWithValue(FakeMemoryRepository()),
     ],
     child: ScreenUtilInit(
@@ -178,6 +202,7 @@ void main() {
   late MockSpeechService mockSpeechService;
 
   setUp(() {
+    SharedPreferences.setMockInitialValues({});
     fakeChatRepo = FakeChatRepository();
     mockSpeechService = MockSpeechService();
   });

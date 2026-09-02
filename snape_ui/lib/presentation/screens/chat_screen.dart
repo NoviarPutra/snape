@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/services/speech_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
@@ -93,7 +94,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           _isRecording = true;
         });
       }
+      final prefs = await SharedPreferences.getInstance();
+      final localeId = prefs.getString('stt_locale') ?? 'id_ID';
+
       await _speechService.startListening(
+        localeId: localeId,
         onResult: (text, isFinal) {
           if (mounted && text.isNotEmpty) {
             setState(() {
