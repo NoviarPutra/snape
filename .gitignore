@@ -39,6 +39,7 @@ snape_ui/windows/
 snape_ui/web/
 
 # IDE / Editors
+.kilo/
 .vscode/
 .idea/
 *.swp
