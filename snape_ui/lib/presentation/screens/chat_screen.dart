@@ -22,7 +22,14 @@ import '../widgets/session_drawer.dart';
 import 'voice_call_screen.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
-  const ChatScreen({super.key});
+  final String? sessionId;
+  final String? spaceSlug;
+
+  const ChatScreen({
+    super.key,
+    this.sessionId,
+    this.spaceSlug,
+  });
 
   @override
   ConsumerState<ChatScreen> createState() => _ChatScreenState();
@@ -44,26 +51,39 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   Future<void> _initSessionAndChat() async {
-    final activeSpace = ref.read(spaceProvider).activeSpace;
-    final spaceSlug = activeSpace?.slug;
-    final sessionNotifier = ref.read(sessionProvider.notifier);
-    await sessionNotifier.loadSessions(spaceSlug: spaceSlug);
+    if (widget.sessionId != null) {
+      if (widget.spaceSlug != null) {
+        final spaceState = ref.read(spaceProvider);
+        if (spaceState.activeSpace?.slug != widget.spaceSlug) {
+          final matching = spaceState.spaces
+              .where((s) => s.slug == widget.spaceSlug)
+              .firstOrNull;
+          if (matching != null) {
+            ref.read(spaceProvider.notifier).selectSpace(matching);
+          }
+        }
+      }
 
-    final sessionState = ref.read(sessionProvider);
-    final spaceSessions = spaceSlug != null
-        ? sessionState.sessions.where((s) => s.spaceSlug == spaceSlug).toList()
-        : sessionState.sessions;
-
-    if (spaceSessions.isEmpty) {
-      await sessionNotifier.createSession(
-        title: activeSpace?.displayName ?? 'Casual English Practice',
-        spaceSlug: spaceSlug ?? 'english_b2',
-      );
+      final chatState = ref.read(chatProvider);
+      if (chatState.sessionId != widget.sessionId) {
+        await ref.read(chatProvider.notifier).switchSession(widget.sessionId!);
+      }
+      return;
     }
 
-    final activeSession = ref.read(sessionProvider).currentSession;
-    if (activeSession != null) {
-      await ref.read(chatProvider.notifier).switchSession(activeSession.id);
+    final activeSpace = ref.read(spaceProvider).activeSpace;
+    final spaceSlug = widget.spaceSlug ?? activeSpace?.slug;
+    final sessionNotifier = ref.read(sessionProvider.notifier);
+
+    final resolvedSession = await sessionNotifier.ensureActiveSession(
+      spaceSlug: spaceSlug ?? 'english_b2',
+      defaultTitle: activeSpace?.displayName ?? 'Casual English Practice',
+    );
+    if (mounted) {
+      final currentChatId = ref.read(chatProvider).sessionId;
+      if (currentChatId != resolvedSession.id) {
+        await ref.read(chatProvider.notifier).switchSession(resolvedSession.id);
+      }
     }
   }
 
@@ -185,9 +205,34 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final sessionState = ref.watch(sessionProvider);
     final chatState = ref.watch(chatProvider);
     final spaceState = ref.watch(spaceProvider);
-    final activeSpace = spaceState.activeSpace;
+
+    final effectiveSessionId = widget.sessionId ?? chatState.sessionId;
+    final currentSession = (effectiveSessionId != null
+            ? sessionState.sessions
+                .where((s) => s.id == effectiveSessionId)
+                .firstOrNull
+            : null) ??
+        sessionState.currentSession;
+
+    final effectiveSpaceSlug = widget.spaceSlug ??
+        currentSession?.spaceSlug ??
+        spaceState.activeSpace?.slug;
+    final activeSpace = (effectiveSpaceSlug != null
+            ? spaceState.spaces
+                .where((s) => s.slug == effectiveSpaceSlug)
+                .firstOrNull
+            : null) ??
+        spaceState.activeSpace;
+
     final isVoiceCallEnabled = activeSpace?.voiceCallEnabled ?? true;
     final isMaterialsEnabled = activeSpace?.cefrLevel != null;
+
+    final isInitializing = (widget.sessionId != null &&
+            chatState.sessionId != widget.sessionId) ||
+        chatState.isLoadingHistory ||
+        (chatState.sessionId == null &&
+            widget.sessionId == null &&
+            sessionState.isLoading);
 
     ref.listen(chatProvider, (previous, next) {
       if (previous?.messages.length != next.messages.length ||
@@ -195,8 +240,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         _scrollToBottom(animated: true);
       }
     });
-
-    final currentSession = sessionState.currentSession;
 
     return Scaffold(
       key: _scaffoldKey,
@@ -360,7 +403,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             onRetry: () => ref.read(chatProvider.notifier).retryConnection(),
           ),
           Expanded(
-            child: chatState.isLoadingHistory
+            child: isInitializing
                 ? const Center(
                     child: CircularProgressIndicator(
                       valueColor:

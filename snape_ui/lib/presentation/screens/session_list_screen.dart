@@ -47,7 +47,10 @@ class _SessionListScreenState extends ConsumerState<SessionListScreen> {
       if (mounted) {
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => const ChatScreen(),
+            builder: (_) => ChatScreen(
+              sessionId: newSession.id,
+              spaceSlug: widget.space.slug,
+            ),
           ),
         );
       }
@@ -60,7 +63,10 @@ class _SessionListScreenState extends ConsumerState<SessionListScreen> {
     if (mounted) {
       Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => const ChatScreen(),
+          builder: (_) => ChatScreen(
+            sessionId: session.id,
+            spaceSlug: widget.space.slug,
+          ),
         ),
       );
     }

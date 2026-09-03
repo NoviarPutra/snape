@@ -5,8 +5,11 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_typography.dart';
 import '../../domain/models/space.dart';
+import '../state/chat_notifier.dart';
 import '../state/providers.dart';
+import '../state/session_notifier.dart';
 import '../widgets/cefr_level_card.dart';
+import 'chat_screen.dart';
 import 'session_list_screen.dart';
 
 class _CefrLevelItem {
@@ -92,11 +95,38 @@ class LevelPickerScreen extends ConsumerWidget {
     );
 
     ref.read(spaceProvider.notifier).selectSpace(matchingSpace);
+    ref.read(sessionProvider.notifier).loadSessions(spaceSlug: matchingSpace.slug);
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => SessionListScreen(space: matchingSpace),
       ),
     );
+  }
+
+  static Future<void> preResolveAndNavigateToChat(
+    BuildContext context,
+    WidgetRef ref,
+    SpaceModel space,
+  ) async {
+    ref.read(spaceProvider.notifier).selectSpace(space);
+    final session =
+        await ref.read(sessionProvider.notifier).ensureActiveSession(
+              spaceSlug: space.slug,
+              defaultTitle: space.displayName,
+            );
+    if (context.mounted) {
+      await ref.read(chatProvider.notifier).switchSession(session.id);
+      if (context.mounted) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => ChatScreen(
+              sessionId: session.id,
+              spaceSlug: space.slug,
+            ),
+          ),
+        );
+      }
+    }
   }
 
   @override

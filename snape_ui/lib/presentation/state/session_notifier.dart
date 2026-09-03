@@ -37,6 +37,38 @@ class SessionNotifier extends StateNotifier<SessionState> {
     state = state.copyWith(currentSession: session, clearError: true);
   }
 
+  Future<SessionModel> ensureActiveSession({
+    required String spaceSlug,
+    required String defaultTitle,
+  }) async {
+    await loadSessions(spaceSlug: spaceSlug);
+    final spaceSessions =
+        state.sessions.where((s) => s.spaceSlug == spaceSlug).toList();
+    if (spaceSessions.isNotEmpty) {
+      final active = spaceSessions.first;
+      selectSession(active);
+      return active;
+    }
+
+    final newSession = await createSession(
+      title: defaultTitle,
+      spaceSlug: spaceSlug,
+    );
+    if (newSession != null) {
+      return newSession;
+    }
+
+    final fallback = SessionModel(
+      id: 'fallback_${DateTime.now().millisecondsSinceEpoch}',
+      title: defaultTitle,
+      spaceSlug: spaceSlug,
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+    selectSession(fallback);
+    return fallback;
+  }
+
   Future<SessionModel?> createSession({
     String title = 'Casual English Chat',
     String spaceSlug = 'english_b2',

@@ -185,5 +185,40 @@ void main() {
       expect(success, isFalse);
       expect(notifier.state.errorMessage, contains('Failed to rename session'));
     });
+
+    test('ensureActiveSession returns existing session if space already has sessions', () async {
+      final session = await notifier.ensureActiveSession(
+        spaceSlug: 'english_b2',
+        defaultTitle: 'B2 English',
+      );
+
+      expect(session.id, 'sess-1');
+      expect(session.spaceSlug, 'english_b2');
+      expect(notifier.state.currentSession?.id, 'sess-1');
+    });
+
+    test('ensureActiveSession creates new session if space has no sessions', () async {
+      final session = await notifier.ensureActiveSession(
+        spaceSlug: 'productivity',
+        defaultTitle: 'Produktivitas',
+      );
+
+      expect(session.id, startsWith('sess-'));
+      expect(session.spaceSlug, 'productivity');
+      expect(session.title, 'Produktivitas');
+      expect(notifier.state.currentSession?.id, session.id);
+    });
+
+    test('ensureActiveSession returns fallback session if createSession throws', () async {
+      repository.shouldThrow = true;
+      final session = await notifier.ensureActiveSession(
+        spaceSlug: 'psychology',
+        defaultTitle: 'Psikologi',
+      );
+
+      expect(session.id, startsWith('fallback_'));
+      expect(session.spaceSlug, 'psychology');
+      expect(session.title, 'Psikologi');
+    });
   });
 }

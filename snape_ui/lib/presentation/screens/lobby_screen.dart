@@ -6,14 +6,43 @@ import '../../core/theme/app_radii.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_typography.dart';
 import '../../domain/models/space.dart';
+import '../state/chat_notifier.dart';
 import '../state/providers.dart';
+import '../state/session_notifier.dart';
 import '../widgets/featured_space_card.dart';
 import '../widgets/space_grid_card.dart';
+import 'chat_screen.dart';
 import 'level_picker_screen.dart';
 import 'session_list_screen.dart';
 
 class LobbyScreen extends ConsumerStatefulWidget {
   const LobbyScreen({super.key});
+
+  static Future<void> preResolveAndNavigateToChat(
+    BuildContext context,
+    WidgetRef ref,
+    SpaceModel space,
+  ) async {
+    ref.read(spaceProvider.notifier).selectSpace(space);
+    final session =
+        await ref.read(sessionProvider.notifier).ensureActiveSession(
+              spaceSlug: space.slug,
+              defaultTitle: space.displayName,
+            );
+    if (context.mounted) {
+      await ref.read(chatProvider.notifier).switchSession(session.id);
+      if (context.mounted) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => ChatScreen(
+              sessionId: session.id,
+              spaceSlug: space.slug,
+            ),
+          ),
+        );
+      }
+    }
+  }
 
   @override
   ConsumerState<LobbyScreen> createState() => _LobbyScreenState();
@@ -62,6 +91,7 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
 
   void _navigateToSpaceSessions(SpaceModel space) {
     ref.read(spaceProvider.notifier).selectSpace(space);
+    ref.read(sessionProvider.notifier).loadSessions(spaceSlug: space.slug);
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => SessionListScreen(space: space),
