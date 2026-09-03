@@ -5,8 +5,11 @@ import '../models/chat_message.dart';
 import '../models/session.dart';
 
 abstract class ChatRepository {
-  Future<List<SessionModel>> getSessions();
-  Future<SessionModel> createSession({String title});
+  Future<List<SessionModel>> getSessions({String? spaceSlug});
+  Future<SessionModel> createSession({
+    String title = 'Casual English Chat',
+    String spaceSlug = 'english_b2',
+  });
   Future<List<ChatMessage>> getSessionHistory(String sessionId);
   Future<void> deleteSession(String sessionId);
   Future<Uint8List> synthesizeAudio(String text);

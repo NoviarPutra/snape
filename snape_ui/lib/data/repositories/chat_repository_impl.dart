@@ -18,13 +18,16 @@ class ChatRepositoryImpl implements ChatRepository {
         _wsClient = wsClient ?? ChatWebSocketClient();
 
   @override
-  Future<List<SessionModel>> getSessions() {
-    return _remoteDataSource.getSessions();
+  Future<List<SessionModel>> getSessions({String? spaceSlug}) {
+    return _remoteDataSource.getSessions(spaceSlug: spaceSlug);
   }
 
   @override
-  Future<SessionModel> createSession({String title = 'Casual English Chat'}) {
-    return _remoteDataSource.createSession(title: title);
+  Future<SessionModel> createSession({
+    String title = 'Casual English Chat',
+    String spaceSlug = 'english_b2',
+  }) {
+    return _remoteDataSource.createSession(title: title, spaceSlug: spaceSlug);
   }
 
   @override

@@ -10,6 +10,7 @@ class ApiConstants {
   static String sessionMessagesUrl(String sessionId) =>
       '$baseHttpUrl/sessions/$sessionId';
   static String get sessionsUrl => '$baseHttpUrl/sessions';
+  static String get spacesUrl => '$baseHttpUrl/spaces';
   static String get ttsSynthesizeUrl => '$baseHttpUrl/tts/synthesize';
   static String get memoriesUrl => '$baseHttpUrl/memories';
   static String memoryDetailUrl(String memoryId) => '$baseHttpUrl/memories/$memoryId';

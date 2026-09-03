@@ -9,10 +9,10 @@ class SessionNotifier extends StateNotifier<SessionState> {
 
   SessionNotifier(this._repository) : super(const SessionState());
 
-  Future<void> loadSessions() async {
+  Future<void> loadSessions({String? spaceSlug}) async {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
-      final sessions = await _repository.getSessions();
+      final sessions = await _repository.getSessions(spaceSlug: spaceSlug);
       SessionModel? current = state.currentSession;
       if (current == null && sessions.isNotEmpty) {
         current = sessions.first;
@@ -37,10 +37,16 @@ class SessionNotifier extends StateNotifier<SessionState> {
     state = state.copyWith(currentSession: session, clearError: true);
   }
 
-  Future<SessionModel?> createSession({String title = 'Casual English Chat'}) async {
+  Future<SessionModel?> createSession({
+    String title = 'Casual English Chat',
+    String spaceSlug = 'english_b2',
+  }) async {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
-      final newSession = await _repository.createSession(title: title);
+      final newSession = await _repository.createSession(
+        title: title,
+        spaceSlug: spaceSlug,
+      );
       final updatedList = [newSession, ...state.sessions];
       state = state.copyWith(
         sessions: updatedList,

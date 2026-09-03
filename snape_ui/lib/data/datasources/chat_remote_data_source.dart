@@ -16,8 +16,20 @@ class ChatRemoteDataSource {
   })  : _client = client ?? http.Client(),
         _baseHttpUrl = baseHttpUrl ?? ApiConstants.baseHttpUrl;
 
-  Future<List<SessionModel>> getSessions({int limit = 50, int offset = 0}) async {
-    final uri = Uri.parse('$_baseHttpUrl/sessions?limit=$limit&offset=$offset');
+  Future<List<SessionModel>> getSessions({
+    int limit = 50,
+    int offset = 0,
+    String? spaceSlug,
+  }) async {
+    final queryParams = <String, String>{
+      'limit': limit.toString(),
+      'offset': offset.toString(),
+    };
+    if (spaceSlug != null && spaceSlug.isNotEmpty) {
+      queryParams['space_slug'] = spaceSlug;
+    }
+
+    final uri = Uri.parse('$_baseHttpUrl/sessions').replace(queryParameters: queryParams);
     final response = await _client.get(uri, headers: AppConfig.defaultHeaders);
 
     if (response.statusCode >= 200 && response.statusCode < 300) {
@@ -30,12 +42,18 @@ class ChatRemoteDataSource {
     }
   }
 
-  Future<SessionModel> createSession({String title = 'Casual English Chat'}) async {
+  Future<SessionModel> createSession({
+    String title = 'Casual English Chat',
+    String spaceSlug = 'english_b2',
+  }) async {
     final uri = Uri.parse('$_baseHttpUrl/sessions');
     final response = await _client.post(
       uri,
       headers: AppConfig.defaultHeaders,
-      body: json.encode({'title': title}),
+      body: json.encode({
+        'title': title,
+        'space_slug': spaceSlug,
+      }),
     );
 
     if (response.statusCode >= 200 && response.statusCode < 300) {

@@ -91,13 +91,17 @@ class FakeChatRepository implements ChatRepository {
   bool connected = false;
 
   @override
-  Future<List<SessionModel>> getSessions() async => [];
+  Future<List<SessionModel>> getSessions({String? spaceSlug}) async => [];
 
   @override
-  Future<SessionModel> createSession({String title = 'Casual English Chat'}) async {
+  Future<SessionModel> createSession({
+    String title = 'Casual English Chat',
+    String spaceSlug = 'english_b2',
+  }) async {
     return SessionModel(
       id: 'sess-1',
       title: title,
+      spaceSlug: spaceSlug,
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
     );

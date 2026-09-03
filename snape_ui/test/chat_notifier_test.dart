@@ -18,11 +18,12 @@ class FakeChatRepository implements ChatRepository {
   List<ChatMessage> mockHistory = [];
 
   @override
-  Future<List<SessionModel>> getSessions() async {
+  Future<List<SessionModel>> getSessions({String? spaceSlug}) async {
     return [
       SessionModel(
         id: 'sess-1',
         title: 'Session 1',
+        spaceSlug: spaceSlug ?? 'english_b2',
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
       )
@@ -30,10 +31,14 @@ class FakeChatRepository implements ChatRepository {
   }
 
   @override
-  Future<SessionModel> createSession({String title = 'Casual English Chat'}) async {
+  Future<SessionModel> createSession({
+    String title = 'Casual English Chat',
+    String spaceSlug = 'english_b2',
+  }) async {
     return SessionModel(
       id: 'sess-2',
       title: title,
+      spaceSlug: spaceSlug,
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
     );
