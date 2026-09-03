@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'core/theme/app_theme.dart';
 import 'flavors.dart';
-import 'presentation/screens/chat_screen.dart';
+import 'presentation/screens/lobby_screen.dart';
 
 Future<void> runSnapeApp(Flavor flavor) async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -44,7 +44,7 @@ class SnapeApp extends StatelessWidget {
           home: child,
         );
       },
-      child: const ChatScreen(),
+      child: const LobbyScreen(),
     );
   }
 }

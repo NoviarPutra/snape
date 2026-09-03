@@ -4,10 +4,13 @@ import '../../core/services/speech_service.dart';
 import '../../data/repositories/chat_repository_impl.dart';
 import '../../data/repositories/memory_repository_impl.dart';
 import '../../data/repositories/space_repository_impl.dart';
+import '../../data/repositories/user_repository_impl.dart';
 import '../../domain/models/memory_item.dart';
+import '../../domain/models/user.dart';
 import '../../domain/repositories/chat_repository.dart';
 import '../../domain/repositories/memory_repository.dart';
 import '../../domain/repositories/space_repository.dart';
+import '../../domain/repositories/user_repository.dart';
 import 'chat_notifier.dart';
 import 'memory_notifier.dart';
 import 'memory_state.dart';
@@ -18,6 +21,15 @@ import 'voice_call_state.dart';
 
 final spaceRepositoryProvider = Provider<SpaceRepository>((ref) {
   return SpaceRepositoryImpl();
+});
+
+final userRepositoryProvider = Provider<UserRepository>((ref) {
+  return UserRepositoryImpl();
+});
+
+final userProfileProvider = FutureProvider<UserModel>((ref) async {
+  final repository = ref.watch(userRepositoryProvider);
+  return repository.getUserProfile();
 });
 
 final spaceProvider =

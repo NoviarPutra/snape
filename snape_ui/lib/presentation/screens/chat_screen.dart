@@ -7,6 +7,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_typography.dart';
 import '../state/chat_notifier.dart';
+import '../state/providers.dart';
 import '../state/session_notifier.dart';
 import '../widgets/chat_empty_view.dart';
 import '../widgets/chat_input_bar.dart';
@@ -39,12 +40,21 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   Future<void> _initSessionAndChat() async {
+    final activeSpace = ref.read(spaceProvider).activeSpace;
+    final spaceSlug = activeSpace?.slug;
     final sessionNotifier = ref.read(sessionProvider.notifier);
-    await sessionNotifier.loadSessions();
+    await sessionNotifier.loadSessions(spaceSlug: spaceSlug);
 
     final sessionState = ref.read(sessionProvider);
-    if (sessionState.sessions.isEmpty) {
-      await sessionNotifier.createSession(title: 'Casual English Practice');
+    final spaceSessions = spaceSlug != null
+        ? sessionState.sessions.where((s) => s.spaceSlug == spaceSlug).toList()
+        : sessionState.sessions;
+
+    if (spaceSessions.isEmpty) {
+      await sessionNotifier.createSession(
+        title: activeSpace?.displayName ?? 'Casual English Practice',
+        spaceSlug: spaceSlug ?? 'english_b2',
+      );
     }
 
     final activeSession = ref.read(sessionProvider).currentSession;
@@ -82,7 +92,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Speech recognition is not available on this device or permission was denied.'),
+              content: Text(
+                  'Speech recognition is not available on this device or permission was denied.'),
               duration: Duration(seconds: 2),
             ),
           );
@@ -121,6 +132,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   void _openVoiceCall() {
+    final activeSpace = ref.read(spaceProvider).activeSpace;
+    if (activeSpace != null && !activeSpace.voiceCallEnabled) return;
     if (_isRecording) {
       _speechService.stopListening();
       if (mounted) {
@@ -144,6 +157,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Widget build(BuildContext context) {
     final sessionState = ref.watch(sessionProvider);
     final chatState = ref.watch(chatProvider);
+    final spaceState = ref.watch(spaceProvider);
+    final activeSpace = spaceState.activeSpace;
+    final isVoiceCallEnabled = activeSpace?.voiceCallEnabled ?? true;
 
     ref.listen(chatProvider, (previous, next) {
       if (previous?.messages.length != next.messages.length ||
@@ -164,7 +180,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           ref.read(chatProvider.notifier).switchSession(session.id);
         },
         onCreateSession: () async {
-          final newSession = await ref.read(sessionProvider.notifier).createSession();
+          final newSession =
+              await ref.read(sessionProvider.notifier).createSession(
+                    title: activeSpace?.displayName ??
+                        'Casual English Practice',
+                    spaceSlug: activeSpace?.slug ?? 'english_b2',
+                  );
           if (newSession != null) {
             await ref.read(chatProvider.notifier).switchSession(newSession.id);
           }
@@ -176,8 +197,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       endDrawer: const MemoryDrawer(),
       appBar: AppBar(
         leading: IconButton(
-          icon: Icon(Icons.menu_rounded, size: 24.r),
-          onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+          icon: Icon(
+            Navigator.canPop(context)
+                ? Icons.arrow_back_rounded
+                : Icons.home_outlined,
+            size: 22.r,
+          ),
+          tooltip: Navigator.canPop(context) ? 'Back' : 'Lobby',
+          onPressed: () {
+            if (Navigator.canPop(context)) {
+              Navigator.of(context).pop();
+            } else {
+              Navigator.of(context).popUntil((route) => route.isFirst);
+            }
+          },
         ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -208,7 +241,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       ? 'Speaking...'
                       : (chatState.isConnected
                           ? 'Live Companion'
-                          : (chatState.isReconnecting ? 'Reconnecting...' : 'Offline')),
+                          : (chatState.isReconnecting
+                              ? 'Reconnecting...'
+                              : 'Offline')),
                   style: AppTypography.caption,
                 ),
               ],
@@ -216,23 +251,34 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           ],
         ),
         actions: [
+          if (isVoiceCallEnabled)
+            IconButton(
+              icon: Icon(Icons.phone_in_talk_rounded,
+                  size: 22.r, color: AppColors.indigoAccent),
+              tooltip: 'Start Voice Call',
+              onPressed: _openVoiceCall,
+            ),
           IconButton(
-            icon: Icon(Icons.phone_in_talk_rounded, size: 22.r, color: AppColors.indigoAccent),
-            tooltip: 'Start Voice Call',
-            onPressed: _openVoiceCall,
-          ),
-          IconButton(
-            icon: Icon(Icons.psychology_outlined, size: 22.r, color: AppColors.indigoAccent),
+            icon: Icon(Icons.psychology_outlined,
+                size: 22.r, color: AppColors.indigoAccent),
             tooltip: 'Memory Drawer',
             onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
           ),
           IconButton(
-            icon: Icon(Icons.add_comment_outlined, size: 22.r, color: AppColors.indigoAccent),
+            icon: Icon(Icons.add_comment_outlined,
+                size: 22.r, color: AppColors.indigoAccent),
             tooltip: 'New Practice Session',
             onPressed: () async {
-              final newSession = await ref.read(sessionProvider.notifier).createSession();
+              final newSession =
+                  await ref.read(sessionProvider.notifier).createSession(
+                        title: activeSpace?.displayName ??
+                            'Casual English Practice',
+                        spaceSlug: activeSpace?.slug ?? 'english_b2',
+                      );
               if (newSession != null) {
-                await ref.read(chatProvider.notifier).switchSession(newSession.id);
+                await ref
+                    .read(chatProvider.notifier)
+                    .switchSession(newSession.id);
               }
             },
           ),
@@ -249,30 +295,39 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             child: chatState.isLoadingHistory
                 ? const Center(
                     child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(AppColors.indigoAccent),
+                      valueColor:
+                          AlwaysStoppedAnimation<Color>(AppColors.indigoAccent),
                     ),
                   )
                 : chatState.messages.isEmpty
                     ? ChatEmptyView(
                         onStartPrompt: () {
-                          ref.read(chatProvider.notifier).sendMessage('Hello Snape! Let\'s practice.');
+                          ref
+                              .read(chatProvider.notifier)
+                              .sendMessage('Hello Snape! Let\'s practice.');
                         },
                       )
                     : ListView.builder(
                         controller: _scrollController,
-                        padding: EdgeInsets.symmetric(vertical: AppSpacing.sm.h),
+                        padding:
+                            EdgeInsets.symmetric(vertical: AppSpacing.sm.h),
                         itemCount: chatState.messages.length,
                         itemBuilder: (context, index) {
                           final message = chatState.messages[index];
-                          final isPlaying = chatState.playingMessageId == message.id && chatState.isSpeaking;
-                          final isLoadingAudio = chatState.loadingAudioMessageId == message.id;
+                          final isPlaying =
+                              chatState.playingMessageId == message.id &&
+                                  chatState.isSpeaking;
+                          final isLoadingAudio =
+                              chatState.loadingAudioMessageId == message.id;
                           return MessageBubble(
                             key: ValueKey(message.id),
                             message: message,
                             isPlaying: isPlaying,
                             isLoadingAudio: isLoadingAudio,
                             onPlayAudio: () {
-                              ref.read(chatProvider.notifier).playMessageAudio(message.id, message.content);
+                              ref
+                                  .read(chatProvider.notifier)
+                                  .playMessageAudio(message.id, message.content);
                             },
                             onStopAudio: () {
                               ref.read(chatProvider.notifier).stopAudio();
@@ -286,7 +341,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             isStreaming: chatState.isStreaming,
             isRecording: _isRecording,
             onMicTap: _toggleVoiceRecording,
-            onVoiceCallTap: _openVoiceCall,
+            onVoiceCallTap: isVoiceCallEnabled ? _openVoiceCall : null,
             onSendMessage: (text) {
               ref.read(chatProvider.notifier).sendMessage(text);
             },
