@@ -18,3 +18,6 @@
 - **Streaming Pipeline**: Low-latency token-by-token and audio chunk stream over WebSocket between FastAPI and the Flutter client.
 - **TTS Synthesis**: Audio stream generation using Pocket-TTS (Kyutai) or modular voice providers from streamed text tokens.
 - **Memory Extractor**: Asynchronous worker extracting episodic/semantic facts from user interactions without blocking live conversation.
+- **Hermes Materials Curator (Agent 1)**: Autonomous pedagogical curation agent governed by `hermes-materials-curator.soul.md` that researches, structures, and writes standardized 5-section CEFR-graded study modules into the Obsidian vault.
+- **Curated Learning Module**: Standardized pedagogical Markdown file containing YAML frontmatter, core vocabulary, grammar patterns, natural reading/dialogue passages, comprehension checks, and discussion prompts.
+- **Obsidian Learning Vault**: Hierarchical markdown repository organized by CEFR levels (`English/A1` through `English/C2`) acting as the reference knowledge base for learning materials.
