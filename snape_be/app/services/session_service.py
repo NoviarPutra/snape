@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from sqlalchemy import desc, select
+from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -108,3 +108,17 @@ async def get_recent_messages(
     messages = list(result.scalars().all())
     messages.reverse()
     return messages
+
+
+async def count_user_messages(db: AsyncSession, session_id: UUID) -> int:
+    """Count total user messages in a chat session."""
+    stmt = (
+        select(func.count())
+        .select_from(ChatMessage)
+        .where(
+            ChatMessage.session_id == session_id,
+            ChatMessage.role == "user",
+        )
+    )
+    result = await db.execute(stmt)
+    return int(result.scalar_one() or 0)

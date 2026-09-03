@@ -185,6 +185,9 @@ class MockLLMService(BaseLLMService):
         self,
         canned_tokens: list[str] | None = None,
         delay_per_token: float = 0.0,
+        canned_response: str | None = None,
+        generate_chat_delay: float = 0.0,
+        generate_chat_error: Exception | None = None,
     ) -> None:
         self.canned_tokens = canned_tokens or [
             "Oh, ",
@@ -194,6 +197,9 @@ class MockLLMService(BaseLLMService):
             "What kind did you pick up?",
         ]
         self.delay_per_token = delay_per_token
+        self.canned_response = canned_response
+        self.generate_chat_delay = generate_chat_delay
+        self.generate_chat_error = generate_chat_error
         self.last_system_instruction: str | None = None
         self.last_contents: list[dict[str, Any]] | None = None
 
@@ -218,9 +224,15 @@ class MockLLMService(BaseLLMService):
         temperature: float = 0.2,
         response_format_json: bool = False,
     ) -> str:
-        """Return concatenated canned tokens."""
+        """Return concatenated canned tokens or canned response."""
         self.last_system_instruction = system_instruction
         self.last_contents = contents
+        if self.generate_chat_delay > 0:
+            await asyncio.sleep(self.generate_chat_delay)
+        if self.generate_chat_error is not None:
+            raise self.generate_chat_error
+        if self.canned_response is not None:
+            return self.canned_response
         return "".join(self.canned_tokens)
 
 

@@ -1,4 +1,6 @@
+import asyncio
 import base64
+from typing import Any
 from uuid import uuid4
 
 import pytest
@@ -184,3 +186,159 @@ async def test_chat_pipeline_english_a1_space_system_prompt(
     # English A1 has tts_enabled=True, so audio event is generated
     audio_events = [e for e in events if isinstance(e, StreamAudioEvent)]
     assert len(audio_events) == 1
+
+
+@pytest.mark.asyncio
+async def test_chat_pipeline_autogens_title_on_fifth_user_message(
+    db_session: AsyncSession,
+) -> None:
+    user = await user_service.get_or_create_default_user(db_session)
+    session = await session_service.create_session(
+        db_session,
+        user_id=user.id,
+        session_in=SessionCreate(space_slug="english_b2"),
+    )
+    await db_session.commit()
+    session_id = session.id
+    assert session.title == "B2 – Conversational"
+
+    mock_llm = MockLLMService(
+        canned_tokens=["OK."],
+        canned_response="Discussing Favorite English Novels",
+    )
+    pipeline = ChatPipeline(llm_service=mock_llm, enable_tts=False)
+
+    # Turns 1 to 4: title should remain placeholder
+    for i in range(1, 5):
+        async for _ in pipeline.stream_turn(
+            db=db_session,
+            session_id=session_id,
+            user_content=f"Turn message {i}",
+        ):
+            pass
+        await asyncio.sleep(0.02)
+        db_session.expire_all()
+        refreshed = await session_service.get_session_by_id(db_session, session_id)
+        assert refreshed is not None
+        assert refreshed.title == "B2 – Conversational"
+
+    # Turn 5: trigger title generation
+    async for _ in pipeline.stream_turn(
+        db=db_session,
+        session_id=session_id,
+        user_content="Turn message 5: I love reading 1984 by George Orwell",
+    ):
+        pass
+
+    # Wait briefly for background task to finish
+    await asyncio.sleep(0.1)
+    db_session.expire_all()
+    refreshed = await session_service.get_session_by_id(db_session, session_id)
+    assert refreshed is not None
+    assert refreshed.title == "Discussing Favorite English Novels"
+
+    # Turn 6: should not re-trigger title generation
+    mock_llm.canned_response = "Different Title That Should Not Apply"
+    async for _ in pipeline.stream_turn(
+        db=db_session,
+        session_id=session_id,
+        user_content="Turn message 6: Another message",
+    ):
+        pass
+
+    await asyncio.sleep(0.1)
+    db_session.expire_all()
+    refreshed = await session_service.get_session_by_id(db_session, session_id)
+    assert refreshed is not None
+    assert refreshed.title == "Discussing Favorite English Novels"
+
+
+@pytest.mark.asyncio
+async def test_chat_pipeline_autogen_title_handles_llm_failure(
+    db_session: AsyncSession,
+) -> None:
+    user = await user_service.get_or_create_default_user(db_session)
+    session = await session_service.create_session(
+        db_session,
+        user_id=user.id,
+        session_in=SessionCreate(space_slug="english_b2"),
+    )
+    await db_session.commit()
+    session_id = session.id
+
+    mock_llm = MockLLMService(
+        canned_tokens=["OK."],
+        generate_chat_error=RuntimeError("LLM Gateway 500 Error"),
+    )
+    pipeline = ChatPipeline(llm_service=mock_llm, enable_tts=False)
+
+    # Execute 5 turns
+    for i in range(1, 6):
+        events = []
+        async for event in pipeline.stream_turn(
+            db=db_session,
+            session_id=session_id,
+            user_content=f"Message {i}",
+        ):
+            events.append(event)
+        assert any(isinstance(e, StreamDoneEvent) for e in events)
+
+    await asyncio.sleep(0.1)
+    db_session.expire_all()
+    refreshed = await session_service.get_session_by_id(db_session, session_id)
+    assert refreshed is not None
+    # Title must remain placeholder and no exception escaped to caller
+    assert refreshed.title == "B2 – Conversational"
+
+
+@pytest.mark.asyncio
+async def test_chat_pipeline_autogen_title_handles_timeout(
+    db_session: AsyncSession,
+) -> None:
+    user = await user_service.get_or_create_default_user(db_session)
+    session = await session_service.create_session(
+        db_session,
+        user_id=user.id,
+        session_in=SessionCreate(space_slug="english_b2"),
+    )
+    await db_session.commit()
+    session_id = session.id
+
+    # Custom mock LLM that only delays when generating title
+    class TimeoutTitleLLM(MockLLMService):
+        async def generate_chat(
+            self,
+            system_instruction: str,
+            contents: list[dict[str, Any]],
+            temperature: float = 0.2,
+            response_format_json: bool = False,
+        ) -> str:
+            if "at most 6 words" in system_instruction or "maksimal 6 kata" in system_instruction:
+                await asyncio.sleep(5.2)
+                return "Too Late Title"
+            return await super().generate_chat(
+                system_instruction,
+                contents,
+                temperature=temperature,
+                response_format_json=response_format_json,
+            )
+
+    mock_llm = TimeoutTitleLLM(canned_tokens=["OK."])
+    pipeline = ChatPipeline(llm_service=mock_llm, enable_tts=False)
+
+    for i in range(1, 6):
+        events = []
+        async for event in pipeline.stream_turn(
+            db=db_session,
+            session_id=session_id,
+            user_content=f"Message {i}",
+        ):
+            events.append(event)
+        assert any(isinstance(e, StreamDoneEvent) for e in events)
+
+    # Let the background timeout trigger
+    await asyncio.sleep(5.3)
+    db_session.expire_all()
+    refreshed = await session_service.get_session_by_id(db_session, session_id)
+    assert refreshed is not None
+    assert refreshed.title == "B2 – Conversational"

@@ -1,20 +1,24 @@
+import asyncio
 import base64
 import logging
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 from uuid import UUID
 
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, AsyncSession, async_sessionmaker
 
 from app.core.config import settings
 from app.core.prompt_builder import (
     DEFAULT_BUFFER_SIZE,
     build_conversation_messages,
     build_system_prompt,
+    build_title_generation_prompt,
 )
-from app.core.space_config import get_space_config
+from app.core.space_config import SpaceConfig, get_space_config
 from app.core.text_sanitizer import sanitize_text_for_tts
+from app.db.session import async_session_factory
 from app.schemas.message import MessageCreate
+from app.schemas.session import SessionUpdate
 from app.services import session_service, user_service
 from app.services.llm_service import BaseLLMService, get_llm_service
 from app.services.memory_service import MemoryService, get_memory_service
@@ -60,12 +64,15 @@ class ChatPipeline:
         tts_provider: BaseTTSProvider | None = None,
         obsidian_service: ObsidianService | None = None,
         enable_tts: bool | None = None,
+        session_factory: async_sessionmaker[AsyncSession] | None = None,
     ) -> None:
         self.llm_service = llm_service or get_llm_service()
         self.memory_service = memory_service or get_memory_service()
         self.tts_provider = tts_provider or get_tts_provider()
         self.obsidian_service = obsidian_service or get_obsidian_service()
         self.enable_tts = enable_tts if enable_tts is not None else settings.ENABLE_TTS
+        self.session_factory = session_factory or async_session_factory
+        self._background_tasks: set[asyncio.Task[None]] = set()
 
     async def stream_turn(
         self,
@@ -202,7 +209,23 @@ class ChatPipeline:
         )
         await db.commit()
 
-        # 10. Extract and persist newly revealed memories
+        # 10. Auto-generate concise session title after exactly 5 user messages
+        try:
+            user_message_count = await session_service.count_user_messages(db, session_id)
+            if user_message_count == 5:
+                task = asyncio.create_task(
+                    self._autogen_session_title(
+                        session_id=session_id,
+                        space_config=space_config,
+                        bind_engine=db.bind,
+                    )
+                )
+                self._background_tasks.add(task)
+                task.add_done_callback(self._background_tasks.discard)
+        except Exception as exc:
+            logger.warning("Error checking message count for title autogen: %s", exc)
+
+        # 11. Extract and persist newly revealed memories
         extracted_memories: list[str] = []
         try:
             extracted_memories = await self.memory_service.extract_and_persist(
@@ -223,7 +246,7 @@ class ChatPipeline:
         except Exception as exc:
             logger.warning("Error during memory extraction in chat pipeline: %s", exc)
 
-        # 11. Yield completion event
+        # 12. Yield completion event
         yield StreamDoneEvent(
             session_id=session_id,
             user_message_id=user_message.id,
@@ -231,6 +254,60 @@ class ChatPipeline:
             full_text=full_text,
             extracted_memories=extracted_memories,
         )
+
+    async def _autogen_session_title(
+        self,
+        session_id: UUID,
+        space_config: SpaceConfig,
+        bind_engine: AsyncEngine | AsyncConnection | None = None,
+    ) -> None:
+        """Background fire-and-forget task to auto-generate a concise session title."""
+        try:
+            async with asyncio.timeout(5.0):
+                if (
+                    self.session_factory is not None
+                    and self.session_factory != async_session_factory
+                ):
+                    session_maker = self.session_factory
+                elif bind_engine is not None:
+                    session_maker = async_sessionmaker(
+                        bind=bind_engine, class_=AsyncSession, expire_on_commit=False
+                    )
+                else:
+                    session_maker = self.session_factory or async_session_factory
+
+                async with session_maker() as bg_db:
+                    messages = await session_service.get_recent_messages(
+                        bg_db, session_id, limit=10
+                    )
+                    if not messages:
+                        return
+
+                    prompt = build_title_generation_prompt(space_config)
+                    contents = [{"role": msg.role, "content": msg.content} for msg in messages]
+                    raw_title = await self.llm_service.generate_chat(
+                        system_instruction=prompt,
+                        contents=contents,
+                        temperature=0.2,
+                    )
+                    clean_title = raw_title.strip().strip("\"'").strip()
+                    if clean_title:
+                        clean_title = clean_title.split("\n")[0].strip().strip("\"'").strip()
+                        await session_service.update_session(
+                            bg_db,
+                            session_id=session_id,
+                            session_in=SessionUpdate(title=clean_title),
+                        )
+                        await bg_db.commit()
+                        logger.info(
+                            "Auto-generated session title for %s: '%s'",
+                            session_id,
+                            clean_title,
+                        )
+        except TimeoutError:
+            logger.warning("Title generation timed out (>5s) for session %s", session_id)
+        except Exception as exc:
+            logger.warning("Title generation failed for session %s: %s", session_id, exc)
 
     async def export_session_journal(self, db: AsyncSession, session_id: UUID) -> None:
         """Export session transcript and takeaways to Obsidian vault."""

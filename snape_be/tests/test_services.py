@@ -137,10 +137,27 @@ async def test_session_service_operations(db_session: AsyncSession) -> None:
     assert updated is not None
     assert updated.title == "Revised Session Title"
 
-    # 6. Delete session
+    # 6. Test count_user_messages
+    count_before = await session_service.count_user_messages(db_session, session.id)
+    assert count_before == 1
+
+    await session_service.add_message(
+        db_session,
+        session_id=session.id,
+        message_in=MessageCreate(role="user", content="Second user question"),
+    )
+    await session_service.add_message(
+        db_session,
+        session_id=session.id,
+        message_in=MessageCreate(role="assistant", content="Second assistant response"),
+    )
+    count_after = await session_service.count_user_messages(db_session, session.id)
+    assert count_after == 2
+
+    # 7. Delete session
     deleted = await session_service.delete_session(db_session, session.id)
     assert deleted is True
 
-    # 7. Confirm deletion
+    # 8. Confirm deletion
     not_found = await session_service.get_session_by_id(db_session, session.id)
     assert not_found is None

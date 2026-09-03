@@ -2,6 +2,7 @@ from app.core.prompt_builder import (
     DEFAULT_BUFFER_SIZE,
     build_conversation_messages,
     build_system_prompt,
+    build_title_generation_prompt,
 )
 from app.core.space_config import get_space_config
 from app.db.models import ChatMessage, User
@@ -103,3 +104,22 @@ def test_build_system_prompt_with_english_a1_space() -> None:
     prompt = build_system_prompt(space_config=a1_config)
     assert "CEFR A1" in prompt
     assert "very simple, clear, and short sentences" in prompt
+
+
+def test_build_title_generation_prompt_english() -> None:
+    b2_config = get_space_config("english_b2")
+    prompt = build_title_generation_prompt(space_config=b2_config)
+    assert "6 words" in prompt.lower() or "6 words" in prompt
+    assert "English" in prompt or "english" in prompt.lower()
+    assert "title" in prompt.lower()
+
+
+def test_build_title_generation_prompt_indonesian() -> None:
+    tech_config = get_space_config("tech")
+    prompt = build_title_generation_prompt(space_config=tech_config)
+    assert "6 kata" in prompt.lower() or "6 kata" in prompt
+    assert (
+        "Bahasa Indonesia" in prompt
+        or "bahasa indonesia" in prompt.lower()
+        or "judul" in prompt.lower()
+    )

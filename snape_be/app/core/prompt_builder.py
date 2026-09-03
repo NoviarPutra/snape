@@ -87,3 +87,19 @@ def build_conversation_messages(
 
     messages.append({"role": "user", "content": current_user_message})
     return messages
+
+
+def build_title_generation_prompt(space_config: SpaceConfig | None = None) -> str:
+    """Build a concise prompt for generating a short session title based on conversation topic."""
+    lang = space_config.language if space_config is not None else "en"
+    if lang == "id":
+        return (
+            "Berikan ringkasan topik percakapan ini dalam maksimal 6 kata dalam Bahasa Indonesia. "
+            "Balas HANYA dengan judul singkat, tanpa tanda kutip, tanpa titik di akhir, "
+            "dan tanpa penjelasan tambahan."
+        )
+    return (
+        "Summarize the main topic of this conversation in at most 6 words in English. "
+        "Respond ONLY with the short title, without quotes, trailing punctuation, "
+        "or extra explanations."
+    )
