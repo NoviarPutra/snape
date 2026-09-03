@@ -1,6 +1,6 @@
 import json
 from collections.abc import AsyncGenerator
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 import httpx
 import pytest
@@ -87,10 +87,10 @@ async def test_omniroute_llm_service_generate_chat() -> None:
     content_payload = json.dumps(
         {"memories": [{"category": "fact", "content": "Lives in Jakarta"}]}
     )
+    encoded_content = json.dumps(content_payload)
+    sse_chunk = f'{{"id":"1","choices":[{{"index":0,"delta":{{"content":{encoded_content}}}}}]}}'
     sse_lines = [
-        f'data: {{"id":"1","choices":[{{"index":0,"delta":{{"content":{json.dumps(content_payload)}}}}}]}}\n\n'.encode(
-            "utf-8"
-        ),
+        f"data: {sse_chunk}\n\n".encode(),
         b"data: [DONE]\n\n",
     ]
 

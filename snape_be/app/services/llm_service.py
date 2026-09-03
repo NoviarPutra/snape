@@ -132,7 +132,9 @@ class OmniRouteLLMService(BaseLLMService):
             should_close = self._external_client is None
 
             try:
-                async with client.stream("POST", endpoint, headers=headers, json=payload) as response:
+                async with client.stream(
+                    "POST", endpoint, headers=headers, json=payload
+                ) as response:
                     response.raise_for_status()
                     async for line in response.aiter_lines():
                         line = line.strip()
@@ -163,7 +165,8 @@ class OmniRouteLLMService(BaseLLMService):
                 if is_retryable and attempt <= self.max_retries:
                     backoff = self.retry_delay * (2 ** (attempt - 1))
                     logger.warning(
-                        "OmniRoute stream attempt %d/%d failed with %s (status=%s). Retrying in %.1fs...",
+                        "OmniRoute stream attempt %d/%d failed (%s, status=%s). "
+                        "Retrying in %.1fs...",
                         attempt,
                         self.max_retries + 1,
                         exc.__class__.__name__,
@@ -211,20 +214,6 @@ class MockLLMService(BaseLLMService):
         response_format_json: bool = False,
     ) -> AsyncGenerator[str, None]:
         """Yield canned tokens with optional delay."""
-        self.last_system_instruction = system_instruction
-        self.last_contents = contents
-        for token in self.canned_tokens:
-            if self.delay_per_token > 0:
-                await asyncio.sleep(self.delay_per_token)
-            yield token
-
-    async def stream_chat(
-        self,
-        system_instruction: str,
-        contents: list[dict[str, Any]],
-        temperature: float = 0.7,
-    ) -> AsyncGenerator[str, None]:
-        """Yield canned tokens sequentially with optional simulated network latency."""
         self.last_system_instruction = system_instruction
         self.last_contents = contents
         for token in self.canned_tokens:

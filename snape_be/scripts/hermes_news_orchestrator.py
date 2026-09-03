@@ -87,9 +87,7 @@ async def run_news_orchestrator(
     all_articles: list[TrendingArticleCreate] = []
 
     for cat in categories_to_run:
-        logger.info(
-            f"🔍 Orchestrating news intelligence: '{cat}' (limit={limit_per_category})..."
-        )
+        logger.info(f"🔍 Orchestrating news intelligence: '{cat}' (limit={limit_per_category})...")
         prompt = build_orchestrator_prompt(category=cat, limit=limit_per_category)
 
         try:

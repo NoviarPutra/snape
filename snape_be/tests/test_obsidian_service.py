@@ -125,7 +125,9 @@ async def test_obsidian_service_rest_api_primary_and_fallback(tmp_path: Path) ->
     mock_client.get.return_value = httpx.Response(
         200, text="# REST Note Content", request=httpx.Request("GET", "https://mock")
     )
-    mock_client.delete.return_value = httpx.Response(204, request=httpx.Request("DELETE", "https://mock"))
+    mock_client.delete.return_value = httpx.Response(
+        204, request=httpx.Request("DELETE", "https://mock")
+    )
 
     service = ObsidianService(
         vault_path=str(vault_dir),

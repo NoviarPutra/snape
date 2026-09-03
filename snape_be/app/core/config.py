@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     DB_POOL_RECYCLE: int = 300
 
     # Obsidian Vault Integration
-    OBSIDIAN_VAULT_PATH: str = str(Path.home() / "obsidian-stack" / "vault")
+    OBSIDIAN_VAULT_PATH: str = str(Path.home() / "obsidian-stack" / "brain")
     OBSIDIAN_ENABLED: bool = True
     OBSIDIAN_REST_URL: str = "https://127.0.0.1:27124"
     OBSIDIAN_REST_API_KEY: str = Field(default="", description="Obsidian Local REST API key")

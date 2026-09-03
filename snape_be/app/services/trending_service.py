@@ -318,9 +318,7 @@ async def sync_trending_topics(
         cat_clean = category.strip().lower()
         if cat_clean not in VALID_TRENDING_CATEGORIES:
             valid_cats = list(VALID_TRENDING_CATEGORIES)
-            raise ValueError(
-                f"Invalid category '{category}'. Valid categories: {valid_cats}"
-            )
+            raise ValueError(f"Invalid category '{category}'. Valid categories: {valid_cats}")
         categories_to_sync = [cat_clean]
 
     total_synced = 0

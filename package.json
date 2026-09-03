@@ -22,6 +22,7 @@
     "hermes:news:general": "cd snape_be && .venv/bin/python scripts/hermes_news_orchestrator.py --category general",
     "hermes:news:music": "cd snape_be && .venv/bin/python scripts/hermes_news_orchestrator.py --category music",
     "hermes:news:creators": "cd snape_be && .venv/bin/python scripts/hermes_news_orchestrator.py --category creator_trends",
+    "vault:push": "cd /home/budiawan/obsidian-stack/brain && git add . && git commit -m \"chore(vault): update study materials [$(date +'%Y-%m-%d %H:%M')]\" || true && git push origin main",
     "ui:dev": "cd snape_ui && flutter run -t lib/main_dev.dart --flavor dev",
     "ui:prod": "cd snape_ui && flutter run -t lib/main_prod.dart --flavor prod",
     "ui:test": "cd snape_ui && flutter test",
