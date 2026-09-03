@@ -1,4 +1,5 @@
 from app.schemas.health import HealthResponse
+from app.schemas.material import MaterialResponse
 from app.schemas.memory import MemoryBase, MemoryCreate, MemoryQueryResult, MemoryResponse
 from app.schemas.message import MessageBase, MessageCreate, MessageResponse
 from app.schemas.session import (
@@ -24,6 +25,7 @@ __all__ = [
     "SessionResponse",
     "SessionDetailResponse",
     "SpacePublicResponse",
+    "MaterialResponse",
     "MessageBase",
     "MessageCreate",
     "MessageResponse",

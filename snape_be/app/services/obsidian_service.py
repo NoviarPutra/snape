@@ -59,7 +59,6 @@ class ObsidianService:
         return topics[:limit]
 
     async def load_curated_topics(self, limit: int = 5) -> list[str]:
-        """Asynchronously load curated discussion topics."""
         if not self.enabled:
             return []
         try:
@@ -67,6 +66,27 @@ class ObsidianService:
         except Exception as exc:
             logger.warning("Error loading curated topics from Obsidian: %s", exc)
             return []
+
+    def _get_learning_materials_sync(self, level: str, category: str) -> str | None:
+        if not self.vault_path.exists():
+            return None
+        target_file = self.snape_dir / "English" / level.lower() / f"{category}.md"
+        if not target_file.is_file():
+            return None
+        try:
+            return target_file.read_text(encoding="utf-8")
+        except Exception as err:
+            logger.debug("Failed to read learning materials file %s: %s", target_file, err)
+            return None
+
+    async def get_learning_materials(self, level: str, category: str) -> str | None:
+        if not self.enabled:
+            return None
+        try:
+            return await asyncio.to_thread(self._get_learning_materials_sync, level, category)
+        except Exception as exc:
+            logger.warning("Error loading learning materials from Obsidian: %s", exc)
+            return None
 
     def _export_session_journal_sync(
         self,

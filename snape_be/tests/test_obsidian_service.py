@@ -75,3 +75,38 @@ async def test_obsidian_service_topics_and_export(tmp_path: Path) -> None:
     profile_content = profile_path.read_text()
     assert "Learner Profile: Dika" in profile_content
     assert "Works as a software engineer" in profile_content
+
+
+@pytest.mark.asyncio
+async def test_obsidian_service_get_learning_materials(tmp_path: Path) -> None:
+    vault_dir = tmp_path / "vault"
+    vault_dir.mkdir()
+    materials_b2_dir = vault_dir / "Snape" / "English" / "b2"
+    materials_b2_dir.mkdir(parents=True)
+
+    cheatsheet_file = materials_b2_dir / "cheatsheet.md"
+    cheatsheet_content = "# B2 Conversational Cheatsheet\n\n- Idiom: Hit the ground running\n"
+    cheatsheet_file.write_text(cheatsheet_content, encoding="utf-8")
+
+    service = ObsidianService(vault_path=str(vault_dir), enabled=True)
+
+    # 1. Successful fetch with lowercase level
+    content = await service.get_learning_materials(level="b2", category="cheatsheet")
+    assert content == cheatsheet_content
+
+    # 2. Successful fetch with uppercase level (case-insensitivity / lowercase resolution)
+    content_upper = await service.get_learning_materials(level="B2", category="cheatsheet")
+    assert content_upper == cheatsheet_content
+
+    # 3. Non-existent category returns None
+    missing_category = await service.get_learning_materials(level="b2", category="slang")
+    assert missing_category is None
+
+    # 4. Non-existent level returns None
+    missing_level = await service.get_learning_materials(level="a1", category="cheatsheet")
+    assert missing_level is None
+
+    # 5. Disabled service returns None
+    disabled_service = ObsidianService(vault_path=str(vault_dir), enabled=False)
+    assert await disabled_service.get_learning_materials(level="b2", category="cheatsheet") is None
+

@@ -1,11 +1,14 @@
+from pathlib import Path
 from uuid import UUID
 
 import pytest
-from httpx import AsyncClient
+from fastapi import FastAPI
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.schemas.memory import MemoryCreate
 from app.services.memory_service import get_memory_service
+from app.services.obsidian_service import ObsidianService, get_obsidian_service
 
 
 @pytest.mark.asyncio
@@ -202,3 +205,53 @@ async def test_memory_endpoints(client: AsyncClient, db_session: AsyncSession) -
     # 7. Deleting already deleted / nonexistent memory returns 404
     del_res_404 = await client.delete(f"/api/v1/memories/{mem1.id}")
     assert del_res_404.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_materials_endpoints(client: AsyncClient, tmp_path: Path) -> None:
+    vault_dir = tmp_path / "vault"
+    vault_dir.mkdir()
+    b2_dir = vault_dir / "Snape" / "English" / "b2"
+    b2_dir.mkdir(parents=True)
+    cheatsheet_file = b2_dir / "cheatsheet.md"
+    cheatsheet_content = "# B2 Cheatsheet Content\n\nConversational phrases."
+    cheatsheet_file.write_text(cheatsheet_content, encoding="utf-8")
+
+    test_obsidian = ObsidianService(vault_path=str(vault_dir), enabled=True)
+
+    transport = client._transport
+    assert isinstance(transport, ASGITransport)
+    app = transport.app
+    assert isinstance(app, FastAPI)
+    app.dependency_overrides[get_obsidian_service] = lambda: test_obsidian
+
+    try:
+        # 1. Valid English space with existing material
+        res = await client.get("/api/v1/materials/english_b2/cheatsheet")
+        assert res.status_code == 200
+        data = res.json()
+        assert data["content"] == cheatsheet_content
+        assert data["space_slug"] == "english_b2"
+        assert data["category"] == "cheatsheet"
+
+        # 2. Non-English space returns 404 with specific detail
+        tech_res = await client.get("/api/v1/materials/tech/cheatsheet")
+        assert tech_res.status_code == 404
+        assert tech_res.json()["detail"] == "Materials not available for this space"
+
+        # 3. Valid space but category file not yet created returns 404
+        missing_res = await client.get("/api/v1/materials/english_b2/vocab-formal")
+        assert missing_res.status_code == 404
+        assert missing_res.json()["detail"] == "Material not yet available"
+
+        # 4. Unknown space slug returns 404
+        unknown_res = await client.get("/api/v1/materials/nonexistent_space/cheatsheet")
+        assert unknown_res.status_code == 404
+
+        # 5. Invalid category returns 404
+        invalid_cat_res = await client.get("/api/v1/materials/english_b2/unknown_category")
+        assert invalid_cat_res.status_code == 404
+        assert invalid_cat_res.json()["detail"] == "Material not yet available"
+    finally:
+        app.dependency_overrides.pop(get_obsidian_service, None)
+
