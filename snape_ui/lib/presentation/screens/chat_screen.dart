@@ -12,6 +12,7 @@ import '../state/session_notifier.dart';
 import '../widgets/chat_empty_view.dart';
 import '../widgets/chat_input_bar.dart';
 import '../widgets/connection_status_banner.dart';
+import '../widgets/materials_panel.dart';
 import '../widgets/memory_drawer.dart';
 import '../widgets/message_bubble.dart';
 import '../widgets/session_drawer.dart';
@@ -160,6 +161,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final spaceState = ref.watch(spaceProvider);
     final activeSpace = spaceState.activeSpace;
     final isVoiceCallEnabled = activeSpace?.voiceCallEnabled ?? true;
+    final isMaterialsEnabled = activeSpace?.cefrLevel != null;
 
     ref.listen(chatProvider, (previous, next) {
       if (previous?.messages.length != next.messages.length ||
@@ -251,6 +253,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           ],
         ),
         actions: [
+          if (isMaterialsEnabled && activeSpace != null)
+            IconButton(
+              icon: Icon(Icons.menu_book_rounded,
+                  size: 22.r, color: AppColors.indigoAccent),
+              tooltip: 'Materi',
+              onPressed: () {
+                MaterialsPanel.show(
+                  context,
+                  spaceSlug: activeSpace.slug,
+                  cefrLevel: activeSpace.cefrLevel,
+                  displayName: activeSpace.displayName,
+                );
+              },
+            ),
           if (isVoiceCallEnabled)
             IconButton(
               icon: Icon(Icons.phone_in_talk_rounded,

@@ -2,16 +2,20 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/services/audio_queue_service.dart';
 import '../../core/services/speech_service.dart';
 import '../../data/repositories/chat_repository_impl.dart';
+import '../../data/repositories/material_repository_impl.dart';
 import '../../data/repositories/memory_repository_impl.dart';
 import '../../data/repositories/space_repository_impl.dart';
 import '../../data/repositories/user_repository_impl.dart';
 import '../../domain/models/memory_item.dart';
 import '../../domain/models/user.dart';
 import '../../domain/repositories/chat_repository.dart';
+import '../../domain/repositories/material_repository.dart';
 import '../../domain/repositories/memory_repository.dart';
 import '../../domain/repositories/space_repository.dart';
 import '../../domain/repositories/user_repository.dart';
 import 'chat_notifier.dart';
+import 'material_notifier.dart';
+import 'material_state.dart';
 import 'memory_notifier.dart';
 import 'memory_state.dart';
 import 'space_notifier.dart';
@@ -67,6 +71,16 @@ final memoryProvider =
 final userMemoriesProvider = FutureProvider<List<MemoryItem>>((ref) async {
   final repository = ref.watch(memoryRepositoryProvider);
   return repository.getMemories();
+});
+
+final materialRepositoryProvider = Provider<MaterialRepository>((ref) {
+  return MaterialRepositoryImpl();
+});
+
+final materialProvider =
+    StateNotifierProvider<MaterialNotifier, MaterialState>((ref) {
+  final repository = ref.watch(materialRepositoryProvider);
+  return MaterialNotifier(repository);
 });
 
 final voiceCallProvider =

@@ -15,6 +15,8 @@ class ApiConstants {
   static String get ttsSynthesizeUrl => '$baseHttpUrl/tts/synthesize';
   static String get memoriesUrl => '$baseHttpUrl/memories';
   static String memoryDetailUrl(String memoryId) => '$baseHttpUrl/memories/$memoryId';
+  static String materialsUrl(String spaceSlug, String category) =>
+      '$baseHttpUrl/materials/$spaceSlug/$category';
   static String chatWsUrl(String sessionId, {String? host}) {
     final effectiveHost = host ?? defaultHost;
     return '${AppConfig.wsScheme}://$effectiveHost/ws/chat/$sessionId';
