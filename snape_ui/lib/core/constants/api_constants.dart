@@ -17,6 +17,25 @@ class ApiConstants {
   static String memoryDetailUrl(String memoryId) => '$baseHttpUrl/memories/$memoryId';
   static String materialsUrl(String spaceSlug, String category) =>
       '$baseHttpUrl/materials/$spaceSlug/$category';
+  static String trendingArticlesUrl({String? category, int? limit}) {
+    final queryParams = <String>[];
+    if (category != null &&
+        category.isNotEmpty &&
+        category.toLowerCase() != 'all') {
+      queryParams.add('category=${Uri.encodeQueryComponent(category)}');
+    }
+    if (limit != null && limit > 0) {
+      queryParams.add('limit=$limit');
+    }
+    if (queryParams.isEmpty) {
+      return '$baseHttpUrl/trending';
+    }
+    return '$baseHttpUrl/trending?${queryParams.join('&')}';
+  }
+
+  static String trendingArticleDetailUrl(String articleId) =>
+      '$baseHttpUrl/trending/$articleId';
+  static String get trendingSyncUrl => '$baseHttpUrl/trending/sync';
   static String chatWsUrl(String sessionId, {String? host}) {
     final effectiveHost = host ?? defaultHost;
     return '${AppConfig.wsScheme}://$effectiveHost/ws/chat/$sessionId';

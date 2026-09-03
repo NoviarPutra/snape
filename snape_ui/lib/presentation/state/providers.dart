@@ -5,6 +5,7 @@ import '../../data/repositories/chat_repository_impl.dart';
 import '../../data/repositories/material_repository_impl.dart';
 import '../../data/repositories/memory_repository_impl.dart';
 import '../../data/repositories/space_repository_impl.dart';
+import '../../data/repositories/trending_repository_impl.dart';
 import '../../data/repositories/user_repository_impl.dart';
 import '../../domain/models/memory_item.dart';
 import '../../domain/models/user.dart';
@@ -12,6 +13,7 @@ import '../../domain/repositories/chat_repository.dart';
 import '../../domain/repositories/material_repository.dart';
 import '../../domain/repositories/memory_repository.dart';
 import '../../domain/repositories/space_repository.dart';
+import '../../domain/repositories/trending_repository.dart';
 import '../../domain/repositories/user_repository.dart';
 import 'chat_notifier.dart';
 import 'material_notifier.dart';
@@ -20,6 +22,8 @@ import 'memory_notifier.dart';
 import 'memory_state.dart';
 import 'space_notifier.dart';
 import 'space_state.dart';
+import 'trending_notifier.dart';
+import 'trending_state.dart';
 import 'voice_call_notifier.dart';
 import 'voice_call_state.dart';
 
@@ -94,3 +98,14 @@ final voiceCallProvider =
     audioQueueService: audioQueueService,
   );
 });
+
+final trendingRepositoryProvider = Provider<TrendingRepository>((ref) {
+  return TrendingRepositoryImpl();
+});
+
+final trendingProvider =
+    StateNotifierProvider<TrendingNotifier, TrendingState>((ref) {
+  final repository = ref.watch(trendingRepositoryProvider);
+  return TrendingNotifier(repository);
+});
+

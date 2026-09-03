@@ -24,11 +24,13 @@ import 'voice_call_screen.dart';
 class ChatScreen extends ConsumerStatefulWidget {
   final String? sessionId;
   final String? spaceSlug;
+  final String? initialMessage;
 
   const ChatScreen({
     super.key,
     this.sessionId,
     this.spaceSlug,
+    this.initialMessage,
   });
 
   @override
@@ -45,6 +47,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.initialMessage != null && widget.initialMessage!.isNotEmpty) {
+      _textController.text = widget.initialMessage!;
+      _textController.selection = TextSelection.fromPosition(
+        TextPosition(offset: _textController.text.length),
+      );
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initSessionAndChat();
     });

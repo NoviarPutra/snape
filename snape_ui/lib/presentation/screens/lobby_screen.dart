@@ -11,8 +11,10 @@ import '../state/providers.dart';
 import '../state/session_notifier.dart';
 import '../widgets/featured_space_card.dart';
 import '../widgets/space_grid_card.dart';
+import '../widgets/trending_hero_banner.dart';
 import 'chat_screen.dart';
 import 'level_picker_screen.dart';
+import 'news_portal_screen.dart';
 import 'session_list_screen.dart';
 
 class LobbyScreen extends ConsumerStatefulWidget {
@@ -85,6 +87,14 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => const LevelPickerScreen(),
+      ),
+    );
+  }
+
+  void _navigateToNewsPortal() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const NewsPortalScreen(),
       ),
     );
   }
@@ -202,6 +212,10 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
           SizedBox(height: AppSpacing.base.h),
           FeaturedSpaceCard(
             onTap: _navigateToLevelPicker,
+          ),
+          SizedBox(height: AppSpacing.md.h),
+          TrendingHeroBanner(
+            onTap: _navigateToNewsPortal,
           ),
           SizedBox(height: AppSpacing.xl.h),
           Text(
