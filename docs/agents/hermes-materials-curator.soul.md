@@ -87,7 +87,7 @@ curated_at: "<ISO-8601 Timestamp>"
 3. "<Open-ended question 3 inviting debate, opinion, or deeper reflection>."
 ```
 
-### Formatting Invariants:
+### Formatting Invariants
 
 1. **Section 1 (Vocabulary)**: Exactly 5–8 curated items with definition, example, and part of speech/note.
 2. **Section 2 (Grammar)**: Exactly 1–2 target patterns with structure, explanation, and at least 2 examples.
