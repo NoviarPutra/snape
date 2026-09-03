@@ -4,6 +4,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from uuid import UUID
 
+import httpx
+
 from app.core.config import settings
 from app.db.models import ChatMessage, User
 
@@ -11,19 +13,180 @@ logger = logging.getLogger(__name__)
 
 
 class ObsidianService:
-    """Lightweight, non-blocking service for integrating Snape AI with Obsidian Vault."""
+    """Lightweight, resilient service for integrating Snape AI with Obsidian Vault.
 
-    def __init__(self, vault_path: str | None = None, enabled: bool | None = None) -> None:
+    Supports dual-mode access: Obsidian Local REST API as primary, with seamless
+    filesystem fallback if the Obsidian desktop client is closed or unreachable.
+    """
+
+    def __init__(
+        self,
+        vault_path: str | None = None,
+        enabled: bool | None = None,
+        rest_url: str | None = None,
+        rest_api_key: str | None = None,
+        use_rest_api: bool | None = None,
+        client: httpx.AsyncClient | None = None,
+        timeout: float = 5.0,
+    ) -> None:
         self.vault_path = Path(vault_path or settings.OBSIDIAN_VAULT_PATH)
         self.enabled = enabled if enabled is not None else settings.OBSIDIAN_ENABLED
+        self.rest_url = (rest_url or settings.OBSIDIAN_REST_URL).rstrip("/")
+        self.rest_api_key = rest_api_key or settings.OBSIDIAN_REST_API_KEY
+        self.use_rest_api = (
+            use_rest_api if use_rest_api is not None else settings.OBSIDIAN_USE_REST_API
+        )
+        self.timeout = timeout
         self.snape_dir = self.vault_path / "Snape"
+        self._client = client
 
-    def _ensure_dirs(self) -> None:
-        """Ensure necessary Snape subdirectories exist in vault."""
+    def _get_client(self) -> httpx.AsyncClient:
+        """Lazily initialize shared async HTTP client with SSL verification skipped for loopback."""
+        if self._client is None or self._client.is_closed:
+            self._client = httpx.AsyncClient(
+                verify=False,
+                timeout=self.timeout,
+            )
+        return self._client
+
+    def _get_headers(self) -> dict[str, str]:
+        """Generate authentication headers for Local REST API."""
+        return {
+            "Authorization": f"Bearer {self.rest_api_key}",
+            "Content-Type": "text/markdown",
+            "Accept": "text/markdown, application/json",
+        }
+
+    async def write_note(self, relative_path: str, content: str) -> Path | str | None:
+        """Write note markdown content to Obsidian via REST API with filesystem fallback."""
         if not self.enabled:
-            return
-        for sub in ("Sessions", "Learnings", "Topics", "Profile"):
-            (self.snape_dir / sub).mkdir(parents=True, exist_ok=True)
+            return None
+
+        clean_rel = relative_path.lstrip("/")
+
+        # 1. Attempt write via Local REST API if configured
+        if self.use_rest_api and self.rest_api_key and self.rest_url:
+            try:
+                client = self._get_client()
+                url = f"{self.rest_url}/vault/{clean_rel}"
+                response = await client.put(
+                    url,
+                    headers=self._get_headers(),
+                    content=content.encode("utf-8"),
+                )
+                if response.status_code in (200, 201, 204):
+                    logger.debug("Successfully wrote note '%s' via Obsidian REST API", clean_rel)
+                    return clean_rel
+                logger.warning(
+                    "Obsidian REST API PUT returned %d: %s. Falling back to disk.",
+                    response.status_code,
+                    response.text,
+                )
+            except (httpx.ConnectError, httpx.TimeoutException, httpx.RequestError) as err:
+                logger.debug("Obsidian REST API unreachable (%s). Using filesystem fallback.", err)
+            except Exception as exc:
+                logger.warning("Unexpected error with Obsidian REST API: %s. Using fallback.", exc)
+
+        # 2. Filesystem fallback
+        try:
+            return await asyncio.to_thread(self._write_file_sync, clean_rel, content)
+        except Exception as exc:
+            logger.error("Failed to write note to disk at %s: %s", clean_rel, exc)
+            return None
+
+    def _write_file_sync(self, relative_path: str, content: str) -> Path:
+        target_file = self.vault_path / relative_path
+        target_file.parent.mkdir(parents=True, exist_ok=True)
+        target_file.write_text(content, encoding="utf-8")
+        return target_file
+
+    async def read_note(self, relative_path: str) -> str | None:
+        """Read note markdown content from Obsidian via REST API with filesystem fallback."""
+        if not self.enabled:
+            return None
+
+        clean_rel = relative_path.lstrip("/")
+
+        # 1. Attempt read via Local REST API if configured
+        if self.use_rest_api and self.rest_api_key and self.rest_url:
+            try:
+                client = self._get_client()
+                url = f"{self.rest_url}/vault/{clean_rel}"
+                response = await client.get(url, headers=self._get_headers())
+                if response.status_code == 200:
+                    return response.text
+                if response.status_code == 404:
+                    return None
+                logger.debug(
+                    "Obsidian REST API GET returned %d for %s",
+                    response.status_code,
+                    clean_rel,
+                )
+            except (httpx.ConnectError, httpx.TimeoutException, httpx.RequestError):
+                pass
+            except Exception as exc:
+                logger.debug("Obsidian REST API read error: %s", exc)
+
+        # 2. Filesystem fallback
+        try:
+            return await asyncio.to_thread(self._read_file_sync, clean_rel)
+        except Exception as exc:
+            logger.debug("Filesystem read failed for %s: %s", clean_rel, exc)
+            return None
+
+    def _read_file_sync(self, relative_path: str) -> str | None:
+        target_file = self.vault_path / relative_path
+        if target_file.is_file():
+            return target_file.read_text(encoding="utf-8")
+        return None
+
+    async def delete_note(self, relative_path: str) -> bool:
+        """Delete note via REST API with filesystem fallback."""
+        if not self.enabled:
+            return False
+
+        clean_rel = relative_path.lstrip("/")
+        if self.use_rest_api and self.rest_api_key and self.rest_url:
+            try:
+                client = self._get_client()
+                url = f"{self.rest_url}/vault/{clean_rel}"
+                response = await client.delete(url, headers=self._get_headers())
+                if response.status_code in (200, 204):
+                    return True
+            except Exception as err:
+                logger.debug("REST delete failed: %s", err)
+
+        try:
+            return await asyncio.to_thread(self._delete_file_sync, clean_rel)
+        except Exception as exc:
+            logger.debug("Filesystem delete failed: %s", exc)
+            return False
+
+    def _delete_file_sync(self, relative_path: str) -> bool:
+        target_file = self.vault_path / relative_path
+        if target_file.is_file():
+            target_file.unlink()
+            return True
+        return False
+
+    async def get_learning_materials(self, level: str, category: str) -> str | None:
+        """Retrieve curated CEFR study materials for a specific space level and topic/slug."""
+        if not self.enabled:
+            return None
+
+        # Check standard level casing conventions (e.g. English/A1/..., English/a1/...)
+        candidate_paths = [
+            f"Snape/English/{level.upper()}/{category}.md",
+            f"Snape/English/{level.lower()}/{category}.md",
+            f"Snape/English/{level}/{category}.md",
+        ]
+
+        for path in candidate_paths:
+            content = await self.read_note(path)
+            if content is not None:
+                return content
+
+        return None
 
     def _load_topics_sync(self, limit: int = 5) -> list[str]:
         """Synchronously scan topics directory and notes cleanly stripping frontmatter."""
@@ -46,7 +209,7 @@ class ObsidianService:
                             if clean == "---":
                                 in_frontmatter = not in_frontmatter
                                 continue
-                            if in_frontmatter:
+                            if in_frontmatter or not clean:
                                 continue
                             if clean:
                                 lines.append(clean.lstrip("#").strip())
@@ -59,6 +222,7 @@ class ObsidianService:
         return topics[:limit]
 
     async def load_curated_topics(self, limit: int = 5) -> list[str]:
+        """Load curated topics list for prompt enrichment."""
         if not self.enabled:
             return []
         try:
@@ -67,41 +231,21 @@ class ObsidianService:
             logger.warning("Error loading curated topics from Obsidian: %s", exc)
             return []
 
-    def _get_learning_materials_sync(self, level: str, category: str) -> str | None:
-        if not self.vault_path.exists():
-            return None
-        target_file = self.snape_dir / "English" / level.lower() / f"{category}.md"
-        if not target_file.is_file():
-            return None
-        try:
-            return target_file.read_text(encoding="utf-8")
-        except Exception as err:
-            logger.debug("Failed to read learning materials file %s: %s", target_file, err)
-            return None
-
-    async def get_learning_materials(self, level: str, category: str) -> str | None:
-        if not self.enabled:
-            return None
-        try:
-            return await asyncio.to_thread(self._get_learning_materials_sync, level, category)
-        except Exception as exc:
-            logger.warning("Error loading learning materials from Obsidian: %s", exc)
-            return None
-
-    def _export_session_journal_sync(
+    async def export_session_journal(
         self,
         session_id: UUID,
         session_title: str | None,
         messages: list[ChatMessage],
         memories: list[str],
-    ) -> Path | None:
-        """Write session journal markdown file synchronously."""
-        self._ensure_dirs()
-        sessions_dir = self.snape_dir / "Sessions"
+    ) -> Path | str | None:
+        """Export session conversation transcript and takeaways to Obsidian."""
+        if not self.enabled:
+            return None
+
         now = datetime.now(UTC)
         date_str = now.strftime("%Y-%m-%d")
         short_id = str(session_id)[:8]
-        file_path = sessions_dir / f"{date_str}_{short_id}.md"
+        rel_path = f"Snape/Sessions/{date_str}_{short_id}.md"
 
         title = session_title or f"Chat Session ({short_id})"
         content_lines = [
@@ -134,41 +278,19 @@ class ObsidianService:
                 else ""
             )
             time_tag = f" [{timestamp}]" if timestamp else ""
-            content_lines.append(f"**{role_label}**{time_tag}:\n{msg.content.strip()}\n")
+            content_lines.append(f"### {role_label}{time_tag}")
+            content_lines.append(msg.content or "")
+            content_lines.append("")
 
-        with open(file_path, "w", encoding="utf-8") as f:
-            f.write("\n".join(content_lines))
+        full_content = "\n".join(content_lines)
+        return await self.write_note(rel_path, full_content)
 
-        return file_path
-
-    async def export_session_journal(
-        self,
-        session_id: UUID,
-        session_title: str | None,
-        messages: list[ChatMessage],
-        memories: list[str],
-    ) -> Path | None:
-        """Asynchronously export session conversation transcript and takeaways to Obsidian."""
+    async def sync_user_profile(self, user: User, memories: list[str]) -> None:
+        """Sync learner profile and accumulated memories to Obsidian."""
         if not self.enabled:
-            return None
-        try:
-            return await asyncio.to_thread(
-                self._export_session_journal_sync,
-                session_id,
-                session_title,
-                messages,
-                memories,
-            )
-        except Exception as exc:
-            logger.warning("Failed to export session journal to Obsidian: %s", exc)
-            return None
+            return
 
-    def _sync_profile_sync(self, user: User, memories: list[str]) -> None:
-        """Sync learner profile and accumulated memories."""
-        self._ensure_dirs()
-        profile_file = self.snape_dir / "Profile" / "User.md"
         now = datetime.now(UTC)
-
         lines = [
             "---",
             "tags:",
@@ -187,19 +309,15 @@ class ObsidianService:
             for mem in memories:
                 lines.append(f"- {mem}")
         else:
-            lines.append("*(No persistent memories recorded yet)*")
+            lines.append("- *No memories recorded yet.*")
 
-        with open(profile_file, "w", encoding="utf-8") as f:
-            f.write("\n".join(lines) + "\n")
+        full_content = "\n".join(lines)
+        await self.write_note("Snape/Profile/User.md", full_content)
 
-    async def sync_user_profile(self, user: User, memories: list[str]) -> None:
-        """Asynchronously update User.md in Obsidian."""
-        if not self.enabled:
-            return
-        try:
-            await asyncio.to_thread(self._sync_profile_sync, user, memories)
-        except Exception as exc:
-            logger.warning("Failed to sync user profile to Obsidian: %s", exc)
+    async def close(self) -> None:
+        """Close internal HTTP client if open."""
+        if self._client is not None and not self._client.is_closed:
+            await self._client.aclose()
 
 
 _obsidian_service: ObsidianService | None = None

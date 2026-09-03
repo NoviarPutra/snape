@@ -7,15 +7,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1 import api_v1_router
 from app.core.config import settings
 from app.db.session import engine
+from app.services.obsidian_service import get_obsidian_service
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """Application lifespan context managing database engine resources."""
+    """Application lifespan context managing database engine and HTTP client resources."""
     # Startup logic
     yield
-    # Shutdown logic: safely dispose database connection pool
+    # Shutdown logic: safely dispose database connection pool and Obsidian REST client
     await engine.dispose()
+    await get_obsidian_service().close()
 
 
 def create_app() -> FastAPI:

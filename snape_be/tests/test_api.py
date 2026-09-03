@@ -217,7 +217,7 @@ async def test_materials_endpoints(client: AsyncClient, tmp_path: Path) -> None:
     cheatsheet_content = "# B2 Cheatsheet Content\n\nConversational phrases."
     cheatsheet_file.write_text(cheatsheet_content, encoding="utf-8")
 
-    test_obsidian = ObsidianService(vault_path=str(vault_dir), enabled=True)
+    test_obsidian = ObsidianService(vault_path=str(vault_dir), enabled=True, use_rest_api=False)
 
     transport = client._transport
     assert isinstance(transport, ASGITransport)

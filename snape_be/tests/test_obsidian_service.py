@@ -1,7 +1,9 @@
 from datetime import UTC, datetime
 from pathlib import Path
+from unittest.mock import AsyncMock
 from uuid import uuid4
 
+import httpx
 import pytest
 
 from app.db.models import ChatMessage, User
@@ -21,7 +23,7 @@ async def test_obsidian_service_topics_and_export(tmp_path: Path) -> None:
         "---\ntags:\n  - snape-topic\n---\n# Sample Topic\nLearning Python and Obsidian together.\n"
     )
 
-    service = ObsidianService(vault_path=str(vault_dir), enabled=True)
+    service = ObsidianService(vault_path=str(vault_dir), enabled=True, use_rest_api=False)
 
     # 1. Test load curated topics
     topics = await service.load_curated_topics(limit=5)
@@ -54,8 +56,8 @@ async def test_obsidian_service_topics_and_export(tmp_path: Path) -> None:
     )
 
     assert file_path is not None
-    assert file_path.exists()
-    content = file_path.read_text()
+    assert Path(file_path).exists()
+    content = Path(file_path).read_text()
     assert "snape-session" in content
     assert "AI Discussion" in content
     assert "Interested in learning AI" in content
@@ -88,7 +90,7 @@ async def test_obsidian_service_get_learning_materials(tmp_path: Path) -> None:
     cheatsheet_content = "# B2 Conversational Cheatsheet\n\n- Idiom: Hit the ground running\n"
     cheatsheet_file.write_text(cheatsheet_content, encoding="utf-8")
 
-    service = ObsidianService(vault_path=str(vault_dir), enabled=True)
+    service = ObsidianService(vault_path=str(vault_dir), enabled=True, use_rest_api=False)
 
     # 1. Successful fetch with lowercase level
     content = await service.get_learning_materials(level="b2", category="cheatsheet")
@@ -109,3 +111,65 @@ async def test_obsidian_service_get_learning_materials(tmp_path: Path) -> None:
     # 5. Disabled service returns None
     disabled_service = ObsidianService(vault_path=str(vault_dir), enabled=False)
     assert await disabled_service.get_learning_materials(level="b2", category="cheatsheet") is None
+
+
+@pytest.mark.asyncio
+async def test_obsidian_service_rest_api_primary_and_fallback(tmp_path: Path) -> None:
+    vault_dir = tmp_path / "vault"
+    vault_dir.mkdir()
+
+    # 1. Test REST API success
+    mock_client = AsyncMock(spec=httpx.AsyncClient)
+    mock_client.is_closed = False
+    mock_client.put.return_value = httpx.Response(204, request=httpx.Request("PUT", "https://mock"))
+    mock_client.get.return_value = httpx.Response(
+        200, text="# REST Note Content", request=httpx.Request("GET", "https://mock")
+    )
+    mock_client.delete.return_value = httpx.Response(204, request=httpx.Request("DELETE", "https://mock"))
+
+    service = ObsidianService(
+        vault_path=str(vault_dir),
+        enabled=True,
+        rest_url="https://127.0.0.1:27124",
+        rest_api_key="mock-key",
+        use_rest_api=True,
+        client=mock_client,
+    )
+
+    write_res = await service.write_note("Snape/test.md", "# Test REST")
+    assert write_res == "Snape/test.md"
+    assert mock_client.put.called
+
+    read_res = await service.read_note("Snape/test.md")
+    assert read_res == "# REST Note Content"
+    assert mock_client.get.called
+
+    del_res = await service.delete_note("Snape/test.md")
+    assert del_res is True
+    assert mock_client.delete.called
+
+    # 2. Test REST API failure / offline fallback to filesystem
+    failing_client = AsyncMock(spec=httpx.AsyncClient)
+    failing_client.is_closed = False
+    failing_client.put.side_effect = httpx.ConnectError("Connection refused")
+    failing_client.get.side_effect = httpx.ConnectError("Connection refused")
+
+    fallback_service = ObsidianService(
+        vault_path=str(vault_dir),
+        enabled=True,
+        rest_url="https://127.0.0.1:27124",
+        rest_api_key="mock-key",
+        use_rest_api=True,
+        client=failing_client,
+    )
+
+    fallback_write = await fallback_service.write_note("Snape/fallback.md", "# Fallback Disk Note")
+    assert fallback_write is not None
+    assert (vault_dir / "Snape" / "fallback.md").exists()
+    assert (vault_dir / "Snape" / "fallback.md").read_text() == "# Fallback Disk Note"
+
+    fallback_read = await fallback_service.read_note("Snape/fallback.md")
+    assert fallback_read == "# Fallback Disk Note"
+
+    await service.close()
+    await fallback_service.close()

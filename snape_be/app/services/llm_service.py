@@ -21,6 +21,7 @@ class BaseLLMService(ABC):
         system_instruction: str,
         contents: list[dict[str, Any]],
         temperature: float = 0.7,
+        response_format_json: bool = False,
     ) -> AsyncGenerator[str, None]:
         """Stream token-by-token responses for a conversation."""
         ...
@@ -38,6 +39,7 @@ class BaseLLMService(ABC):
             system_instruction=system_instruction,
             contents=contents,
             temperature=temperature,
+            response_format_json=response_format_json,
         ):
             tokens.append(chunk)
         return "".join(tokens)
@@ -52,12 +54,20 @@ class OmniRouteLLMService(BaseLLMService):
         api_key: str | None = None,
         model: str | None = None,
         client: httpx.AsyncClient | None = None,
-        timeout: float = 60.0,
+        timeout: float | None = None,
+        max_retries: int | None = None,
+        retry_delay: float | None = None,
     ) -> None:
         self.base_url = (base_url or settings.OMNIROUTE_BASE_URL).rstrip("/")
         self.api_key = api_key or settings.OMNIROUTE_API_KEY
         self.model = model or settings.OMNIROUTE_MODEL
-        self.timeout = timeout
+        self.timeout = timeout if timeout is not None else settings.OMNIROUTE_TIMEOUT
+        self.max_retries = (
+            max_retries if max_retries is not None else settings.OMNIROUTE_MAX_RETRIES
+        )
+        self.retry_delay = (
+            retry_delay if retry_delay is not None else settings.OMNIROUTE_RETRY_DELAY
+        )
         self._external_client = client
 
     def _format_messages(
@@ -95,57 +105,9 @@ class OmniRouteLLMService(BaseLLMService):
         system_instruction: str,
         contents: list[dict[str, Any]],
         temperature: float = 0.7,
+        response_format_json: bool = False,
     ) -> AsyncGenerator[str, None]:
         """Stream tokens asynchronously via OmniRoute chat completions SSE endpoint."""
-        messages = self._format_messages(system_instruction, contents)
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {self.api_key}",
-        }
-        payload = {
-            "model": self.model,
-            "messages": messages,
-            "temperature": temperature,
-            "stream": True,
-        }
-
-        endpoint = f"{self.base_url}/chat/completions"
-        client = await self._get_client()
-        should_close = self._external_client is None
-
-        try:
-            async with client.stream("POST", endpoint, headers=headers, json=payload) as response:
-                response.raise_for_status()
-                async for line in response.aiter_lines():
-                    line = line.strip()
-                    if not line:
-                        continue
-                    if line.startswith("data: "):
-                        data_str = line[6:].strip()
-                        if data_str == "[DONE]":
-                            break
-                        try:
-                            chunk_data = json.loads(data_str)
-                            choices = chunk_data.get("choices", [])
-                            if choices and len(choices) > 0:
-                                delta = choices[0].get("delta", {})
-                                content = delta.get("content")
-                                if content:
-                                    yield content
-                        except json.JSONDecodeError:
-                            logger.debug("Failed to decode SSE JSON chunk: %s", data_str)
-        finally:
-            if should_close:
-                await client.aclose()
-
-    async def generate_chat(
-        self,
-        system_instruction: str,
-        contents: list[dict[str, Any]],
-        temperature: float = 0.2,
-        response_format_json: bool = False,
-    ) -> str:
-        """Generate full completion via OmniRoute."""
         messages = self._format_messages(system_instruction, contents)
         headers = {
             "Content-Type": "application/json",
@@ -155,27 +117,65 @@ class OmniRouteLLMService(BaseLLMService):
             "model": self.model,
             "messages": messages,
             "temperature": temperature,
-            "stream": False,
+            "stream": True,
         }
         if response_format_json:
             payload["response_format"] = {"type": "json_object"}
 
         endpoint = f"{self.base_url}/chat/completions"
-        client = await self._get_client()
-        should_close = self._external_client is None
+        attempt = 0
+        yielded_any = False
 
-        try:
-            response = await client.post(endpoint, headers=headers, json=payload)
-            response.raise_for_status()
-            data = response.json()
-            choices = data.get("choices", [])
-            if choices and len(choices) > 0:
-                message = choices[0].get("message", {})
-                return message.get("content", "") or ""
-            return ""
-        finally:
-            if should_close:
-                await client.aclose()
+        while True:
+            attempt += 1
+            client = await self._get_client()
+            should_close = self._external_client is None
+
+            try:
+                async with client.stream("POST", endpoint, headers=headers, json=payload) as response:
+                    response.raise_for_status()
+                    async for line in response.aiter_lines():
+                        line = line.strip()
+                        if not line:
+                            continue
+                        if line.startswith("data: "):
+                            data_str = line[6:].strip()
+                            if data_str == "[DONE]":
+                                break
+                            try:
+                                chunk_data = json.loads(data_str)
+                                choices = chunk_data.get("choices", [])
+                                if choices and len(choices) > 0:
+                                    delta = choices[0].get("delta", {})
+                                    content = delta.get("content")
+                                    if content:
+                                        yielded_any = True
+                                        yield content
+                            except json.JSONDecodeError:
+                                logger.debug("Failed to decode SSE JSON chunk: %s", data_str)
+                return
+            except (httpx.TimeoutException, httpx.NetworkError, httpx.HTTPStatusError) as exc:
+                status_code = getattr(getattr(exc, "response", None), "status_code", None)
+                is_retryable = not yielded_any and (
+                    isinstance(exc, (httpx.TimeoutException, httpx.NetworkError))
+                    or status_code in (429, 500, 502, 503, 504)
+                )
+                if is_retryable and attempt <= self.max_retries:
+                    backoff = self.retry_delay * (2 ** (attempt - 1))
+                    logger.warning(
+                        "OmniRoute stream attempt %d/%d failed with %s (status=%s). Retrying in %.1fs...",
+                        attempt,
+                        self.max_retries + 1,
+                        exc.__class__.__name__,
+                        status_code,
+                        backoff,
+                    )
+                    await asyncio.sleep(backoff)
+                else:
+                    raise
+            finally:
+                if should_close:
+                    await client.aclose()
 
 
 class MockLLMService(BaseLLMService):
@@ -202,6 +202,21 @@ class MockLLMService(BaseLLMService):
         self.generate_chat_error = generate_chat_error
         self.last_system_instruction: str | None = None
         self.last_contents: list[dict[str, Any]] | None = None
+
+    async def stream_chat(
+        self,
+        system_instruction: str,
+        contents: list[dict[str, Any]],
+        temperature: float = 0.7,
+        response_format_json: bool = False,
+    ) -> AsyncGenerator[str, None]:
+        """Yield canned tokens with optional delay."""
+        self.last_system_instruction = system_instruction
+        self.last_contents = contents
+        for token in self.canned_tokens:
+            if self.delay_per_token > 0:
+                await asyncio.sleep(self.delay_per_token)
+            yield token
 
     async def stream_chat(
         self,

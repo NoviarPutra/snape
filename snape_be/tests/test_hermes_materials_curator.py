@@ -15,7 +15,6 @@ from hermes_materials_curator import (  # noqa: E402
     parse_cli_args,
     parse_curated_markdown,
     run_curator,
-    save_material_to_vault,
     slugify_topic,
     validate_curated_markdown,
 )
@@ -162,26 +161,31 @@ def test_parse_curated_markdown() -> None:
     assert len(parsed["sections"]) >= 5
 
 
-def test_save_material_to_vault(tmp_path: Path) -> None:
-    saved_path = save_material_to_vault(
-        vault_path=tmp_path,
-        level="B2",
-        topic="Remote Work & Nomadism",
-        content=SAMPLE_VALID_MARKDOWN_B2,
-        overwrite=True,
-    )
-    assert saved_path.exists()
-    assert saved_path == tmp_path / "Snape" / "English" / "B2" / "remote-work-nomadism.md"
-    assert saved_path.read_text(encoding="utf-8") == SAMPLE_VALID_MARKDOWN_B2
+@pytest.mark.asyncio
+async def test_run_curator_overwrite_false_raises_on_existing_file(tmp_path: Path) -> None:
+    mock_llm = AsyncMock()
+    mock_llm.generate_chat.return_value = SAMPLE_VALID_MARKDOWN_B2
 
-    # Test overwrite=False raises or skips
+    # First run creates the file
+    paths = await run_curator(
+        level="B2",
+        topic="Remote Work",
+        vault_path=str(tmp_path),
+        dry_run=False,
+        overwrite=True,
+        llm_service=mock_llm,
+    )
+    assert paths[0].exists()
+
+    # Second run with overwrite=False must raise since the file already exists
     with pytest.raises(FileExistsError):
-        save_material_to_vault(
-            vault_path=tmp_path,
+        await run_curator(
             level="B2",
-            topic="Remote Work & Nomadism",
-            content="Different content",
+            topic="Remote Work",
+            vault_path=str(tmp_path),
+            dry_run=False,
             overwrite=False,
+            llm_service=mock_llm,
         )
 
 
@@ -263,3 +267,8 @@ def test_parse_cli_args() -> None:
     assert args_all.level == "all"
     assert args_all.topic == "Travel"
     assert args_all.overwrite is False
+
+    args_default = parse_cli_args([])
+    assert args_default.level == "all"
+    assert args_default.topic == "Daily Life & Practical Communication"
+    assert args_default.overwrite is True

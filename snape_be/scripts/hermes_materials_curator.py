@@ -22,11 +22,13 @@ if str(BACKEND_DIR) not in sys.path:
 
 from app.core.config import settings  # noqa: E402
 from app.services.llm_service import BaseLLMService, OmniRouteLLMService  # noqa: E402
+from app.services.obsidian_service import ObsidianService  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger("hermes_materials_curator")
 
 VALID_CEFR_LEVELS: tuple[str, ...] = ("A1", "A2", "B1", "B2", "C1", "C2")
+DEFAULT_CURATION_TOPIC = "Daily Life & Practical Communication"
 
 CEFR_LEVEL_GUIDELINES: dict[str, dict[str, str]] = {
     "A1": {
@@ -175,26 +177,59 @@ curated_at: "{iso_now}"
     return system_prompt, user_prompt
 
 
+def clean_markdown_output(raw: str) -> str:
+    """Clean LLM output by stripping code fences, preambles, and isolating frontmatter."""
+    if not raw or not raw.strip():
+        return ""
+
+    cleaned = raw.strip()
+
+    # Strip whole-response markdown code fences if present
+    fence_match = re.search(
+        r"^```(?:markdown)?\s*\n(.*?)\n```$",
+        cleaned,
+        re.DOTALL | re.IGNORECASE,
+    )
+    if fence_match:
+        cleaned = fence_match.group(1).strip()
+    else:
+        cleaned = re.sub(r"^```(?:markdown)?\s*\n?", "", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"\n?```$", "", cleaned)
+
+    # If there is conversational preamble before the opening '---', slice from '---'
+    if not cleaned.startswith("---"):
+        idx = cleaned.find("---")
+        if idx != -1:
+            cleaned = cleaned[idx:].strip()
+
+    return cleaned
+
+
 def validate_curated_markdown(content: str, expected_level: str | None = None) -> tuple[bool, str]:
     """Validate that curated markdown adheres to the 5-section standard and frontmatter schema."""
-    if not content or not content.strip():
+    cleaned = clean_markdown_output(content)
+    if not cleaned:
         return False, "Content is empty"
 
-    text = content.strip()
+    text = cleaned
     # Check frontmatter
-    fm_match = re.match(r"^---\s*\n(.*?)\n---\s*\n", text, re.DOTALL)
+    fm_match = re.search(r"^---\s*\n(.*?)\n---\s*\n?", text, re.DOTALL)
     if not fm_match:
         return False, "Missing YAML frontmatter block enclosed in ---"
 
     fm_text = fm_match.group(1)
     required_keys = ("title", "level", "topic", "tags", "curated_at")
     for key in required_keys:
-        if not re.search(rf"^{key}:", fm_text, re.MULTILINE):
+        if not re.search(rf"^\s*{key}:", fm_text, re.MULTILINE | re.IGNORECASE):
             return False, f"Missing required frontmatter key: '{key}'"
 
     # Verify level if expected
     if expected_level:
-        level_match = re.search(r"^level:\s*[\"']?([a-zA-Z0-9]+)[\"']?", fm_text, re.MULTILINE)
+        level_match = re.search(
+            r"^\s*level:\s*[\"']?([a-zA-Z0-9]+)[\"']?",
+            fm_text,
+            re.MULTILINE | re.IGNORECASE,
+        )
         if not level_match:
             return False, "Could not parse 'level' from frontmatter"
         parsed_level = level_match.group(1).upper()
@@ -224,8 +259,8 @@ def validate_curated_markdown(content: str, expected_level: str | None = None) -
 
 def parse_curated_markdown(content: str) -> dict[str, Any]:
     """Parse curated markdown into structured metadata and sections."""
-    text = content.strip()
-    fm_match = re.match(r"^---\s*\n(.*?)\n---\s*\n", text, re.DOTALL)
+    text = clean_markdown_output(content)
+    fm_match = re.search(r"^---\s*\n(.*?)\n---\s*\n?", text, re.DOTALL)
     frontmatter: dict[str, Any] = {}
 
     if fm_match:
@@ -236,16 +271,18 @@ def parse_curated_markdown(content: str) -> dict[str, Any]:
                 continue
             if ":" in line:
                 key, val = line.split(":", 1)
-                key = key.strip()
+                key = key.strip().lower()
                 val = val.strip().strip("\"'")
                 if key == "tags":
-                    frontmatter[key] = []
-                elif line.startswith("-") and "tags" in frontmatter:
-                    frontmatter["tags"].append(line.lstrip("- ").strip("\"'"))
-                else:
+                    frontmatter["tags"] = []
+                elif key in ("title", "level", "topic", "curated_at"):
                     frontmatter[key] = val
-            elif line.startswith("-") and "tags" in frontmatter:
-                frontmatter["tags"].append(line.lstrip("- ").strip("\"'"))
+            elif (
+                line.startswith("-")
+                and "tags" in frontmatter
+                and isinstance(frontmatter["tags"], list)
+            ):
+                frontmatter["tags"].append(line.lstrip("- ").strip().strip("\"'"))
 
     body = text[fm_match.end() :] if fm_match else text
 
@@ -266,28 +303,6 @@ def parse_curated_markdown(content: str) -> dict[str, Any]:
     }
 
 
-def save_material_to_vault(
-    vault_path: Path | str,
-    level: str,
-    topic: str,
-    content: str,
-    overwrite: bool = True,
-) -> Path:
-    """Save curated markdown file into Obsidian vault subfolder Snape/English/<LEVEL>/."""
-    norm_level = level.upper()
-    slug = slugify_topic(topic)
-    target_dir = Path(vault_path) / "Snape" / "English" / norm_level
-    target_dir.mkdir(parents=True, exist_ok=True)
-
-    file_path = target_dir / f"{slug}.md"
-    if file_path.exists() and not overwrite:
-        raise FileExistsError(f"Material file already exists at {file_path}")
-
-    file_path.write_text(content, encoding="utf-8")
-    logger.info("Saved curated module to %s", file_path)
-    return file_path
-
-
 async def run_curator(
     level: str,
     topic: str,
@@ -295,11 +310,17 @@ async def run_curator(
     dry_run: bool = False,
     overwrite: bool = True,
     llm_service: BaseLLMService | None = None,
+    obsidian_service: ObsidianService | None = None,
     model: str | None = None,
+    timeout: float | None = None,
 ) -> list[Path]:
     """Orchestrate curation across one or all CEFR levels."""
     resolved_vault = Path(vault_path or settings.OBSIDIAN_VAULT_PATH)
-    llm = llm_service or OmniRouteLLMService(model=model)
+    llm = llm_service or OmniRouteLLMService(model=model, timeout=timeout)
+    obs = obsidian_service or ObsidianService(
+        vault_path=str(resolved_vault),
+        use_rest_api=settings.OBSIDIAN_USE_REST_API if vault_path is None else False,
+    )
 
     if level.lower() == "all":
         target_levels = list(VALID_CEFR_LEVELS)
@@ -321,9 +342,8 @@ async def run_curator(
             temperature=0.3,
         )
 
-        # Strip surrounding markdown code fences if output by LLM
-        cleaned = re.sub(r"^```(?:markdown)?\s*\n", "", generated_raw.strip(), flags=re.IGNORECASE)
-        cleaned = re.sub(r"\n```$", "", cleaned.strip())
+        # Clean and extract markdown
+        cleaned = clean_markdown_output(generated_raw)
 
         is_valid, reason = validate_curated_markdown(cleaned, expected_level=lvl)
         if not is_valid:
@@ -334,14 +354,19 @@ async def run_curator(
             print(cleaned)
             print("================================================================\n")
         else:
-            path = save_material_to_vault(
-                vault_path=resolved_vault,
-                level=lvl,
-                topic=topic,
-                content=cleaned,
-                overwrite=overwrite,
-            )
-            saved_paths.append(path)
+            slug = slugify_topic(topic)
+            rel_path = f"Snape/English/{lvl}/{slug}.md"
+            target_path = resolved_vault / rel_path
+
+            if target_path.exists() and not overwrite:
+                raise FileExistsError(f"Material file already exists at {target_path}")
+
+            await obs.write_note(rel_path, cleaned)
+            # Ensure local mirror exists for consistent return value regardless of REST API path
+            target_path.parent.mkdir(parents=True, exist_ok=True)
+            if not target_path.exists():
+                target_path.write_text(cleaned, encoding="utf-8")
+            saved_paths.append(target_path)
 
     return saved_paths
 
@@ -357,15 +382,15 @@ def parse_cli_args(args: list[str] | None = None) -> argparse.Namespace:
         "-l",
         "--level",
         type=str,
-        required=True,
-        help=f"Target CEFR level ({', '.join(VALID_CEFR_LEVELS)}) or 'all'",
+        default="all",
+        help=f"Target CEFR level ({', '.join(VALID_CEFR_LEVELS)}) or 'all' (default: all)",
     )
     parser.add_argument(
         "-t",
         "--topic",
         type=str,
-        required=True,
-        help="Thematic topic for the curated study module (e.g. 'Remote Work & Digital Nomadism')",
+        default=DEFAULT_CURATION_TOPIC,
+        help=f"Thematic topic for the curated study module (default: '{DEFAULT_CURATION_TOPIC}')",
     )
     parser.add_argument(
         "--vault-path",
@@ -397,6 +422,12 @@ def parse_cli_args(args: list[str] | None = None) -> argparse.Namespace:
         default=None,
         help="Optional OmniRoute model override",
     )
+    parser.add_argument(
+        "--timeout",
+        type=float,
+        default=None,
+        help="Optional HTTP timeout in seconds (default: settings.OMNIROUTE_TIMEOUT)",
+    )
     return parser.parse_args(args)
 
 
@@ -411,6 +442,7 @@ async def main() -> None:
             dry_run=args.dry_run,
             overwrite=args.overwrite,
             model=args.model,
+            timeout=args.timeout,
         )
         if not args.dry_run:
             print(f"Successfully curated {len(paths)} module(s):")

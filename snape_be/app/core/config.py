@@ -40,13 +40,19 @@ class Settings(BaseSettings):
     DB_POOL_RECYCLE: int = 300
 
     # Obsidian Vault Integration
-    OBSIDIAN_VAULT_PATH: str = "/home/voldemort/obsidian-stack/vault"
+    OBSIDIAN_VAULT_PATH: str = str(Path.home() / "obsidian-stack" / "vault")
     OBSIDIAN_ENABLED: bool = True
+    OBSIDIAN_REST_URL: str = "https://127.0.0.1:27124"
+    OBSIDIAN_REST_API_KEY: str = Field(default="", description="Obsidian Local REST API key")
+    OBSIDIAN_USE_REST_API: bool = True
 
     # LLM & OmniRoute Gateway
     OMNIROUTE_BASE_URL: str = "http://localhost:20128/v1"
     OMNIROUTE_API_KEY: str = Field(default="", description="OmniRoute API key")
     OMNIROUTE_MODEL: str = "antigravity/gemini-3.7-flash-high"
+    OMNIROUTE_TIMEOUT: float = 120.0
+    OMNIROUTE_MAX_RETRIES: int = 3
+    OMNIROUTE_RETRY_DELAY: float = 2.0
 
     # Embedding Dimension (768-dim for pgvector)
     EMBEDDING_DIMENSION: int = 768

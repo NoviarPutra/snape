@@ -87,24 +87,31 @@ async def test_omniroute_llm_service_generate_chat() -> None:
     content_payload = json.dumps(
         {"memories": [{"category": "fact", "content": "Lives in Jakarta"}]}
     )
+    sse_lines = [
+        f'data: {{"id":"1","choices":[{{"index":0,"delta":{{"content":{json.dumps(content_payload)}}}}}]}}\n\n'.encode(
+            "utf-8"
+        ),
+        b"data: [DONE]\n\n",
+    ]
+
+    async def mock_aiter_lines() -> AsyncGenerator[str, None]:
+        for line in sse_lines:
+            yield line.decode("utf-8").strip()
+
     mock_response = MagicMock()
     mock_response.status_code = 200
-    mock_response.json = MagicMock(
-        return_value={
-            "choices": [
-                {
-                    "message": {
-                        "role": "assistant",
-                        "content": content_payload,
-                    }
-                }
-            ]
-        }
-    )
+    mock_response.aiter_lines = mock_aiter_lines
     mock_response.raise_for_status = MagicMock()
 
+    class MockStreamContext:
+        async def __aenter__(self) -> MagicMock:
+            return mock_response
+
+        async def __aexit__(self, exc_type: object, exc_val: object, exc_tb: object) -> None:
+            pass
+
     mock_client = MagicMock(spec=httpx.AsyncClient)
-    mock_client.post = AsyncMock(return_value=mock_response)
+    mock_client.stream = MagicMock(return_value=MockStreamContext())
 
     service = OmniRouteLLMService(
         base_url="http://localhost:20128/v1",
@@ -119,10 +126,118 @@ async def test_omniroute_llm_service_generate_chat() -> None:
     )
 
     assert "Lives in Jakarta" in result
-    mock_client.post.assert_called_once()
+    mock_client.stream.assert_called_once()
 
 
 @pytest.mark.asyncio
 async def test_get_llm_service_default() -> None:
     service = get_llm_service()
     assert isinstance(service, OmniRouteLLMService)
+
+
+@pytest.mark.asyncio
+async def test_omniroute_llm_service_retry_on_504_gateway_timeout() -> None:
+    fail_response = httpx.Response(
+        status_code=504,
+        request=httpx.Request("POST", "https://api.omniroute.test/v1/chat/completions"),
+    )
+
+    class FailStreamContext:
+        async def __aenter__(self) -> MagicMock:
+            raise httpx.HTTPStatusError(
+                "504 Gateway Timeout",
+                request=fail_response.request,
+                response=fail_response,
+            )
+
+        async def __aexit__(self, exc_type: object, exc_val: object, exc_tb: object) -> None:
+            pass
+
+    sse_lines = [
+        b'data: {"id":"1","choices":[{"index":0,"delta":{"content":"Success after retry"}}]}\n\n',
+        b"data: [DONE]\n\n",
+    ]
+
+    async def mock_aiter_lines() -> AsyncGenerator[str, None]:
+        for line in sse_lines:
+            yield line.decode("utf-8").strip()
+
+    success_response = MagicMock()
+    success_response.status_code = 200
+    success_response.aiter_lines = mock_aiter_lines
+    success_response.raise_for_status = MagicMock()
+
+    class SuccessStreamContext:
+        async def __aenter__(self) -> MagicMock:
+            return success_response
+
+        async def __aexit__(self, exc_type: object, exc_val: object, exc_tb: object) -> None:
+            pass
+
+    mock_client = MagicMock(spec=httpx.AsyncClient)
+    mock_client.stream = MagicMock(
+        side_effect=[
+            FailStreamContext(),
+            SuccessStreamContext(),
+        ]
+    )
+
+    service = OmniRouteLLMService(
+        base_url="http://localhost:20128/v1",
+        api_key="test-key",
+        client=mock_client,
+        max_retries=2,
+        retry_delay=0.01,
+    )
+
+    result = await service.generate_chat(
+        system_instruction="Curate content",
+        contents=[{"role": "user", "content": "Topic"}],
+    )
+
+    assert result == "Success after retry"
+    assert mock_client.stream.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_omniroute_llm_service_retry_exceeded_raises_error() -> None:
+    fail_response = httpx.Response(
+        status_code=504,
+        request=httpx.Request("POST", "https://api.omniroute.test/v1/chat/completions"),
+    )
+
+    class FailStreamContext:
+        async def __aenter__(self) -> MagicMock:
+            raise httpx.HTTPStatusError(
+                "504 Gateway Timeout",
+                request=fail_response.request,
+                response=fail_response,
+            )
+
+        async def __aexit__(self, exc_type: object, exc_val: object, exc_tb: object) -> None:
+            pass
+
+    mock_client = MagicMock(spec=httpx.AsyncClient)
+    mock_client.stream = MagicMock(
+        side_effect=[
+            FailStreamContext(),
+            FailStreamContext(),
+        ]
+    )
+
+    service = OmniRouteLLMService(
+        base_url="http://localhost:20128/v1",
+        api_key="test-key",
+        client=mock_client,
+        max_retries=1,
+        retry_delay=0.01,
+    )
+
+    with pytest.raises(httpx.HTTPStatusError) as exc_info:
+        await service.generate_chat(
+            system_instruction="Curate content",
+            contents=[{"role": "user", "content": "Topic"}],
+        )
+
+    assert exc_info.value.response.status_code == 504
+    assert mock_client.stream.call_count == 2
