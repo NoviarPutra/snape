@@ -204,6 +204,9 @@ class MockLLMService(BaseLLMService):
         self.generate_chat_delay = generate_chat_delay
         self.generate_chat_error = generate_chat_error
         self.last_system_instruction: str | None = None
+        self.last_stream_system_instruction: str | None = None
+        self.last_generate_system_instruction: str | None = None
+        self.system_instructions_history: list[str] = []
         self.last_contents: list[dict[str, Any]] | None = None
 
     async def stream_chat(
@@ -215,6 +218,8 @@ class MockLLMService(BaseLLMService):
     ) -> AsyncGenerator[str, None]:
         """Yield canned tokens with optional delay."""
         self.last_system_instruction = system_instruction
+        self.last_stream_system_instruction = system_instruction
+        self.system_instructions_history.append(system_instruction)
         self.last_contents = contents
         for token in self.canned_tokens:
             if self.delay_per_token > 0:
@@ -230,6 +235,8 @@ class MockLLMService(BaseLLMService):
     ) -> str:
         """Return concatenated canned tokens or canned response."""
         self.last_system_instruction = system_instruction
+        self.last_generate_system_instruction = system_instruction
+        self.system_instructions_history.append(system_instruction)
         self.last_contents = contents
         if self.generate_chat_delay > 0:
             await asyncio.sleep(self.generate_chat_delay)

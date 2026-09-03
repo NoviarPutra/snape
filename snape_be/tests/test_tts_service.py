@@ -1,5 +1,8 @@
 import io
 import wave
+from collections.abc import AsyncGenerator
+from typing import Any
+from unittest.mock import patch
 
 import pytest
 
@@ -67,10 +70,14 @@ async def test_edge_tts_provider_synthesize() -> None:
     provider = EdgeTTSProvider(voice="en-US-AndrewMultilingualNeural")
     assert isinstance(provider, BaseTTSProvider)
 
-    audio_bytes = await provider.synthesize("Hello friend, welcome to Snape!")
-    assert len(audio_bytes) > 0
+    async def mock_stream(self: Any) -> AsyncGenerator[dict[str, Any], None]:
+        yield {"type": "audio", "data": b"MOCK_EDGE_TTS_STREAM_BYTES"}
 
-    multilingual_audio = await provider.synthesize(
-        "That means 'kamu sangat luar biasa' in Indonesian."
-    )
-    assert len(multilingual_audio) > 0
+    with patch("edge_tts.Communicate.stream", mock_stream):
+        audio_bytes = await provider.synthesize("Hello friend, welcome to Snape!")
+        assert audio_bytes == b"MOCK_EDGE_TTS_STREAM_BYTES"
+
+        multilingual_audio = await provider.synthesize(
+            "That means 'kamu sangat luar biasa' in Indonesian."
+        )
+        assert multilingual_audio == b"MOCK_EDGE_TTS_STREAM_BYTES"

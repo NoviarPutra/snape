@@ -142,9 +142,9 @@ async def test_chat_pipeline_tech_space_no_tts_and_indonesian_prompt(
         events.append(event)
 
     # 1. Verify system instruction sent to LLM contains Indonesian tech instructions
-    assert mock_llm.last_system_instruction is not None
-    assert "software engineer senior" in mock_llm.last_system_instruction
-    assert "Soft Correction" not in mock_llm.last_system_instruction
+    assert mock_llm.last_stream_system_instruction is not None
+    assert "software engineer senior" in mock_llm.last_stream_system_instruction
+    assert "Soft Correction" not in mock_llm.last_stream_system_instruction
 
     # 2. Verify NO audio events generated because tech space has tts_enabled=False
     audio_events = [e for e in events if isinstance(e, StreamAudioEvent)]
@@ -179,9 +179,9 @@ async def test_chat_pipeline_english_a1_space_system_prompt(
     ):
         events.append(event)
 
-    assert mock_llm.last_system_instruction is not None
-    assert "CEFR A1" in mock_llm.last_system_instruction
-    assert "very simple, clear, and short sentences" in mock_llm.last_system_instruction
+    assert mock_llm.last_stream_system_instruction is not None
+    assert "CEFR A1" in mock_llm.last_stream_system_instruction
+    assert "very simple, clear, and short sentences" in mock_llm.last_stream_system_instruction
 
     # English A1 has tts_enabled=True, so audio event is generated
     audio_events = [e for e in events if isinstance(e, StreamAudioEvent)]
@@ -314,7 +314,7 @@ async def test_chat_pipeline_autogen_title_handles_timeout(
             response_format_json: bool = False,
         ) -> str:
             if "at most 6 words" in system_instruction or "maksimal 6 kata" in system_instruction:
-                await asyncio.sleep(5.2)
+                await asyncio.sleep(0.1)
                 return "Too Late Title"
             return await super().generate_chat(
                 system_instruction,
@@ -324,7 +324,11 @@ async def test_chat_pipeline_autogen_title_handles_timeout(
             )
 
     mock_llm = TimeoutTitleLLM(canned_tokens=["OK."])
-    pipeline = ChatPipeline(llm_service=mock_llm, enable_tts=False)
+    pipeline = ChatPipeline(
+        llm_service=mock_llm,
+        enable_tts=False,
+        title_autogen_timeout=0.04,
+    )
 
     for i in range(1, 6):
         events = []
@@ -337,7 +341,7 @@ async def test_chat_pipeline_autogen_title_handles_timeout(
         assert any(isinstance(e, StreamDoneEvent) for e in events)
 
     # Let the background timeout trigger
-    await asyncio.sleep(5.3)
+    await asyncio.sleep(0.12)
     db_session.expire_all()
     refreshed = await session_service.get_session_by_id(db_session, session_id)
     assert refreshed is not None

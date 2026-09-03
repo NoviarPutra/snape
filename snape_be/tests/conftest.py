@@ -36,6 +36,9 @@ def setup_test_env() -> None:
     settings.ENABLE_TTS = False
     settings.TTS_PROVIDER = "mock"
     settings.OBSIDIAN_ENABLED = False
+    settings.OMNIROUTE_TIMEOUT = 1.0
+    settings.OMNIROUTE_MAX_RETRIES = 0
+    settings.OMNIROUTE_RETRY_DELAY = 0.01
 
 
 @pytest.fixture

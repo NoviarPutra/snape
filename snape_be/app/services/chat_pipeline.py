@@ -65,13 +65,23 @@ class ChatPipeline:
         obsidian_service: ObsidianService | None = None,
         enable_tts: bool | None = None,
         session_factory: async_sessionmaker[AsyncSession] | None = None,
+        title_autogen_timeout: float = 5.0,
     ) -> None:
         self.llm_service = llm_service or get_llm_service()
-        self.memory_service = memory_service or get_memory_service()
+        self.memory_service = (
+            memory_service
+            if memory_service is not None
+            else (
+                MemoryService(llm_service=self.llm_service)
+                if llm_service is not None
+                else get_memory_service()
+            )
+        )
         self.tts_provider = tts_provider or get_tts_provider()
         self.obsidian_service = obsidian_service or get_obsidian_service()
         self.enable_tts = enable_tts if enable_tts is not None else settings.ENABLE_TTS
         self.session_factory = session_factory or async_session_factory
+        self.title_autogen_timeout = title_autogen_timeout
         self._background_tasks: set[asyncio.Task[None]] = set()
 
     async def stream_turn(
@@ -263,7 +273,7 @@ class ChatPipeline:
     ) -> None:
         """Background fire-and-forget task to auto-generate a concise session title."""
         try:
-            async with asyncio.timeout(5.0):
+            async with asyncio.timeout(self.title_autogen_timeout):
                 if (
                     self.session_factory is not None
                     and self.session_factory != async_session_factory
