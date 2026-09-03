@@ -369,10 +369,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   )
                 : chatState.messages.isEmpty
                     ? ChatEmptyView(
-                        onStartPrompt: () {
+                        starterPrompts: activeSpace?.starterPrompts,
+                        space: activeSpace,
+                        onSelectPrompt: (prompt) {
                           ref
                               .read(chatProvider.notifier)
-                              .sendMessage('Hello Snape! Let\'s practice.');
+                              .sendMessage(prompt);
                         },
                       )
                     : ListView.builder(

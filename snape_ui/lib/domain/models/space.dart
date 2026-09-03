@@ -7,6 +7,7 @@ class SpaceModel {
   final String? cefrLevel;
   final bool voiceCallEnabled;
   final bool ttsEnabled;
+  final List<String> starterPrompts;
 
   const SpaceModel({
     required this.slug,
@@ -14,6 +15,7 @@ class SpaceModel {
     this.cefrLevel,
     required this.voiceCallEnabled,
     required this.ttsEnabled,
+    this.starterPrompts = const [],
   });
 
   factory SpaceModel.fromJson(Map<String, dynamic> json) {
@@ -30,6 +32,13 @@ class SpaceModel {
       ttsEnabled: (json['tts_enabled'] as bool?) ??
           (json['ttsEnabled'] as bool?) ??
           false,
+      starterPrompts: (json['starter_prompts'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          (json['starterPrompts'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [],
     );
   }
 
@@ -40,6 +49,7 @@ class SpaceModel {
       'cefr_level': cefrLevel,
       'voice_call_enabled': voiceCallEnabled,
       'tts_enabled': ttsEnabled,
+      'starter_prompts': starterPrompts,
     };
   }
 
@@ -49,6 +59,7 @@ class SpaceModel {
     String? cefrLevel,
     bool? voiceCallEnabled,
     bool? ttsEnabled,
+    List<String>? starterPrompts,
     bool clearCefrLevel = false,
   }) {
     return SpaceModel(
@@ -57,6 +68,7 @@ class SpaceModel {
       cefrLevel: clearCefrLevel ? null : (cefrLevel ?? this.cefrLevel),
       voiceCallEnabled: voiceCallEnabled ?? this.voiceCallEnabled,
       ttsEnabled: ttsEnabled ?? this.ttsEnabled,
+      starterPrompts: starterPrompts ?? this.starterPrompts,
     );
   }
 
@@ -69,7 +81,8 @@ class SpaceModel {
           displayName == other.displayName &&
           cefrLevel == other.cefrLevel &&
           voiceCallEnabled == other.voiceCallEnabled &&
-          ttsEnabled == other.ttsEnabled;
+          ttsEnabled == other.ttsEnabled &&
+          listEquals(starterPrompts, other.starterPrompts);
 
   @override
   int get hashCode =>
@@ -77,9 +90,10 @@ class SpaceModel {
       displayName.hashCode ^
       cefrLevel.hashCode ^
       voiceCallEnabled.hashCode ^
-      ttsEnabled.hashCode;
+      ttsEnabled.hashCode ^
+      Object.hashAll(starterPrompts);
 
   @override
   String toString() =>
-      'SpaceModel(slug: $slug, displayName: $displayName, cefrLevel: $cefrLevel, voiceCallEnabled: $voiceCallEnabled, ttsEnabled: $ttsEnabled)';
+      'SpaceModel(slug: $slug, displayName: $displayName, cefrLevel: $cefrLevel, voiceCallEnabled: $voiceCallEnabled, ttsEnabled: $ttsEnabled, starterPrompts: $starterPrompts)';
 }

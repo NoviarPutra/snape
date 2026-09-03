@@ -14,6 +14,7 @@ class SpaceConfig:
     voice_call_enabled: bool
     tts_voice: str | None
     obsidian_materials_path: str | None
+    starter_prompts: tuple[str, ...] = ()
 
 
 PROMPT_ENGLISH_A1 = """\
@@ -260,6 +261,11 @@ SPACE_REGISTRY: dict[str, SpaceConfig] = {
         voice_call_enabled=True,
         tts_voice=DEFAULT_TTS_VOICE,
         obsidian_materials_path="English/A1",
+        starter_prompts=(
+            "Hello Snape! How are you today?",
+            "What is your favorite food?",
+            "Can we practice simple English words?",
+        ),
     ),
     "english_a2": SpaceConfig(
         slug="english_a2",
@@ -271,6 +277,11 @@ SPACE_REGISTRY: dict[str, SpaceConfig] = {
         voice_call_enabled=True,
         tts_voice=DEFAULT_TTS_VOICE,
         obsidian_materials_path="English/A2",
+        starter_prompts=(
+            "What did you do last weekend?",
+            "Can you tell me about your daily routine?",
+            "Help me describe my hometown in English.",
+        ),
     ),
     "english_b1": SpaceConfig(
         slug="english_b1",
@@ -282,6 +293,11 @@ SPACE_REGISTRY: dict[str, SpaceConfig] = {
         voice_call_enabled=True,
         tts_voice=DEFAULT_TTS_VOICE,
         obsidian_materials_path="English/B1",
+        starter_prompts=(
+            "What are your plans and goals for this year?",
+            "Can we roleplay ordering food at a restaurant?",
+            "How do you usually spend your holidays?",
+        ),
     ),
     "english_b2": SpaceConfig(
         slug="english_b2",
@@ -293,6 +309,11 @@ SPACE_REGISTRY: dict[str, SpaceConfig] = {
         voice_call_enabled=True,
         tts_voice=DEFAULT_TTS_VOICE,
         obsidian_materials_path="English/B2",
+        starter_prompts=(
+            "What do you think about remote work vs working in an office?",
+            "Let's discuss the impact of social media on daily habits.",
+            "Can we do a mock job interview for a software role?",
+        ),
     ),
     "english_c1": SpaceConfig(
         slug="english_c1",
@@ -304,6 +325,11 @@ SPACE_REGISTRY: dict[str, SpaceConfig] = {
         voice_call_enabled=True,
         tts_voice=DEFAULT_TTS_VOICE,
         obsidian_materials_path="English/C1",
+        starter_prompts=(
+            "How do socioeconomic factors influence urban development?",
+            "Let's explore the ethical implications of artificial intelligence.",
+            "What are the nuances between assertive and aggressive communication?",
+        ),
     ),
     "english_c2": SpaceConfig(
         slug="english_c2",
@@ -315,6 +341,11 @@ SPACE_REGISTRY: dict[str, SpaceConfig] = {
         voice_call_enabled=True,
         tts_voice=DEFAULT_TTS_VOICE,
         obsidian_materials_path="English/C2",
+        starter_prompts=(
+            "How does linguistic relativity shape cognitive perceptions of reality?",
+            "Let's dissect the philosophical paradoxes within existentialism.",
+            "Can we debate the merits and perils of technocratic governance?",
+        ),
     ),
     "tech": SpaceConfig(
         slug="tech",
@@ -326,6 +357,11 @@ SPACE_REGISTRY: dict[str, SpaceConfig] = {
         voice_call_enabled=False,
         tts_voice=None,
         obsidian_materials_path=None,
+        starter_prompts=(
+            "Apa perbedaan utama arsitektur monolitik dan microservices?",
+            "Bagaimana cara memilih database SQL vs NoSQL untuk aplikasi baru?",
+            "Tren teknologi apa yang paling menarik perhatianmu saat ini?",
+        ),
     ),
     "psychology": SpaceConfig(
         slug="psychology",
@@ -337,6 +373,11 @@ SPACE_REGISTRY: dict[str, SpaceConfig] = {
         voice_call_enabled=False,
         tts_voice=None,
         obsidian_materials_path=None,
+        starter_prompts=(
+            "Bagaimana cara mengatasi cognitive overload saat belajar hal baru?",
+            "Apa pengaruh bias konfirmasi dalam pengambilan keputusan sehari-hari?",
+            "Kenapa habit building membutuhkan konsistensi dibanding motivasi?",
+        ),
     ),
     "productivity": SpaceConfig(
         slug="productivity",
@@ -348,6 +389,11 @@ SPACE_REGISTRY: dict[str, SpaceConfig] = {
         voice_call_enabled=False,
         tts_voice=None,
         obsidian_materials_path=None,
+        starter_prompts=(
+            "Bagaimana cara menerapkan teknik Time Blocking secara efektif?",
+            "Apa tips terbaik untuk mengatasi prokrastinasi saat kerjaan menumpuk?",
+            "Bagaimana cara menyusun sistem review mingguan (weekly review)?",
+        ),
     ),
 }
 

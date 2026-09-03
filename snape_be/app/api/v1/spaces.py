@@ -16,6 +16,7 @@ async def list_spaces() -> list[SpacePublicResponse]:
             cefr_level=cfg.cefr_level,
             tts_enabled=cfg.tts_enabled,
             voice_call_enabled=cfg.voice_call_enabled,
+            starter_prompts=list(cfg.starter_prompts),
         )
         for cfg in SPACE_REGISTRY.values()
     ]

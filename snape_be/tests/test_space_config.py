@@ -14,6 +14,14 @@ def test_get_space_config_returns_correct_config() -> None:
     assert config.tts_voice is not None
     assert config.obsidian_materials_path == "English/B2"
     assert len(config.system_prompt) > 0
+    assert len(config.starter_prompts) == 3
+
+
+def test_every_space_has_three_curated_starter_prompts() -> None:
+    for slug, config in SPACE_REGISTRY.items():
+        assert len(config.starter_prompts) == 3, f"{slug} should have 3 starter prompts"
+        for prompt in config.starter_prompts:
+            assert isinstance(prompt, str) and len(prompt.strip()) > 0
 
 
 def test_get_space_config_raises_for_unknown_slug() -> None:
@@ -82,6 +90,9 @@ async def test_get_spaces_api(client: AsyncClient) -> None:
         assert "cefr_level" in item
         assert "tts_enabled" in item
         assert "voice_call_enabled" in item
+        assert "starter_prompts" in item
+        assert isinstance(item["starter_prompts"], list)
+        assert len(item["starter_prompts"]) == 3
         assert "system_prompt" not in item
         assert "tts_voice" not in item
         assert "obsidian_materials_path" not in item

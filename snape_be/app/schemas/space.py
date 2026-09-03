@@ -11,3 +11,10 @@ class SpacePublicResponse(BaseModel):
     )
     tts_enabled: bool = Field(..., description="Whether Text-to-Speech is enabled")
     voice_call_enabled: bool = Field(..., description="Whether Voice Call mode is enabled")
+    starter_prompts: list[str] = Field(
+        default_factory=list,
+        description="Curated starter prompts for initiating conversation",
+    )
+
+
+SpaceResponse = SpacePublicResponse

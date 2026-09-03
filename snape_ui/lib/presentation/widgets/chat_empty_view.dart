@@ -4,17 +4,43 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_radii.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_typography.dart';
+import '../../domain/models/space.dart';
 
 class ChatEmptyView extends StatelessWidget {
+  final List<String>? starterPrompts;
+  final SpaceModel? space;
+  final ValueChanged<String>? onSelectPrompt;
   final VoidCallback? onStartPrompt;
 
   const ChatEmptyView({
     super.key,
+    this.starterPrompts,
+    this.space,
+    this.onSelectPrompt,
     this.onStartPrompt,
   });
 
+  static const List<String> _defaultPrompts = [
+    'Hey Snape, how was your day?',
+    'Bisa bantu latihan speaking buat interview?',
+  ];
+
   @override
   Widget build(BuildContext context) {
+    final prompts = (starterPrompts != null && starterPrompts!.isNotEmpty)
+        ? starterPrompts!
+        : (space != null && space!.starterPrompts.isNotEmpty)
+            ? space!.starterPrompts
+            : _defaultPrompts;
+
+    final title = space?.displayName.isNotEmpty == true
+        ? space!.displayName
+        : 'Your English Companion';
+
+    final subtitle = space != null && space!.cefrLevel == null
+        ? 'Diskusikan topik ini bersama Snape, kembangkan wawasan dan pola pikir.'
+        : 'Chat freely in English, Indonesian, or code-switch naturally. Snape softly models natural phrasing.';
+
     return Center(
       child: SingleChildScrollView(
         padding: EdgeInsets.symmetric(horizontal: AppSpacing.xl.w),
@@ -36,13 +62,13 @@ class ChatEmptyView extends StatelessWidget {
             ),
             SizedBox(height: AppSpacing.base.h),
             Text(
-              'Your English Companion',
+              title,
               style: AppTypography.titleMedium,
               textAlign: TextAlign.center,
             ),
             SizedBox(height: AppSpacing.xs.h),
             Text(
-              'Chat freely in English, Indonesian, or code-switch naturally. Snape softly models natural phrasing.',
+              subtitle,
               style: AppTypography.bodyMedium.copyWith(
                 color: AppColors.slateSecondary,
                 height: 1.45,
@@ -50,15 +76,16 @@ class ChatEmptyView extends StatelessWidget {
               textAlign: TextAlign.center,
             ),
             SizedBox(height: AppSpacing.lg.h),
-            _PromptSuggestionCard(
-              prompt: 'Hey Snape, how was your day?',
-              onTap: () => onStartPrompt?.call(),
-            ),
-            SizedBox(height: AppSpacing.xs.h),
-            _PromptSuggestionCard(
-              prompt: 'Bisa bantu latihan speaking buat interview?',
-              onTap: () => onStartPrompt?.call(),
-            ),
+            for (int i = 0; i < prompts.length; i++) ...[
+              if (i > 0) SizedBox(height: AppSpacing.xs.h),
+              _PromptSuggestionCard(
+                prompt: prompts[i],
+                onTap: () {
+                  onSelectPrompt?.call(prompts[i]);
+                  onStartPrompt?.call();
+                },
+              ),
+            ],
           ],
         ),
       ),

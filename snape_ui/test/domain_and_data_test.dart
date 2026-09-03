@@ -23,6 +23,11 @@ void main() {
         'cefr_level': 'B2',
         'voice_call_enabled': true,
         'tts_enabled': true,
+        'starter_prompts': [
+          'What do you think about remote work?',
+          'Let\'s discuss social media habits.',
+          'Mock interview practice.',
+        ],
       };
 
       final space = SpaceModel.fromJson(json);
@@ -31,6 +36,8 @@ void main() {
       expect(space.cefrLevel, 'B2');
       expect(space.voiceCallEnabled, isTrue);
       expect(space.ttsEnabled, isTrue);
+      expect(space.starterPrompts, hasLength(3));
+      expect(space.starterPrompts.first, 'What do you think about remote work?');
 
       final outJson = space.toJson();
       expect(outJson['slug'], 'english_b2');
@@ -38,6 +45,7 @@ void main() {
       expect(outJson['cefr_level'], 'B2');
       expect(outJson['voice_call_enabled'], isTrue);
       expect(outJson['tts_enabled'], isTrue);
+      expect(outJson['starter_prompts'], hasLength(3));
     });
 
     test('fromJson handles null cefr_level and camelCase fallbacks', () {
@@ -47,6 +55,9 @@ void main() {
         'cefrLevel': null,
         'voiceCallEnabled': false,
         'ttsEnabled': false,
+        'starterPrompts': [
+          'Apa perbedaan monolith vs microservices?',
+        ],
       };
 
       final space = SpaceModel.fromJson(json);
@@ -55,6 +66,7 @@ void main() {
       expect(space.cefrLevel, isNull);
       expect(space.voiceCallEnabled, isFalse);
       expect(space.ttsEnabled, isFalse);
+      expect(space.starterPrompts, ['Apa perbedaan monolith vs microservices?']);
     });
   });
 
