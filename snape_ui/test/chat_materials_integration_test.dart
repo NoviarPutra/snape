@@ -63,6 +63,17 @@ class FakeChatRepository implements ChatRepository {
   }
 
   @override
+  Future<SessionModel> updateSessionTitle(String sessionId, String title) async {
+    final index = sessions.indexWhere((s) => s.id == sessionId);
+    if (index == -1) {
+      throw Exception('Session not found');
+    }
+    final updated = sessions[index].copyWith(title: title, updatedAt: DateTime.now());
+    sessions[index] = updated;
+    return updated;
+  }
+
+  @override
   Future<Uint8List> synthesizeAudio(String text) async =>
       Uint8List.fromList([1, 2, 3]);
 

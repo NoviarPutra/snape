@@ -12,6 +12,7 @@ class SessionDrawer extends StatelessWidget {
   final SessionModel? currentSession;
   final ValueChanged<SessionModel> onSelectSession;
   final VoidCallback onCreateSession;
+  final ValueChanged<SessionModel> onRenameSession;
   final ValueChanged<String> onDeleteSession;
 
   const SessionDrawer({
@@ -20,6 +21,7 @@ class SessionDrawer extends StatelessWidget {
     required this.currentSession,
     required this.onSelectSession,
     required this.onCreateSession,
+    required this.onRenameSession,
     required this.onDeleteSession,
   });
 
@@ -101,13 +103,28 @@ class SessionDrawer extends StatelessWidget {
                                 dateStr,
                                 style: AppTypography.caption,
                               ),
-                              trailing: IconButton(
-                                icon: Icon(
-                                  Icons.delete_outline_rounded,
-                                  size: 18.r,
-                                  color: AppColors.slateTertiary,
-                                ),
-                                onPressed: () => onDeleteSession(session.id),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    icon: Icon(
+                                      Icons.edit_outlined,
+                                      size: 18.r,
+                                      color: AppColors.slateTertiary,
+                                    ),
+                                    tooltip: 'Rename Session',
+                                    onPressed: () => onRenameSession(session),
+                                  ),
+                                  IconButton(
+                                    icon: Icon(
+                                      Icons.delete_outline_rounded,
+                                      size: 18.r,
+                                      color: AppColors.slateTertiary,
+                                    ),
+                                    tooltip: 'Delete Session',
+                                    onPressed: () => onDeleteSession(session.id),
+                                  ),
+                                ],
                               ),
                               onTap: () {
                                 Navigator.pop(context);

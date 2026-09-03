@@ -53,6 +53,17 @@ class FakeChatRepository implements ChatRepository {
   Future<void> deleteSession(String sessionId) async {}
 
   @override
+  Future<SessionModel> updateSessionTitle(String sessionId, String title) async {
+    return SessionModel(
+      id: sessionId,
+      title: title,
+      spaceSlug: 'english_b2',
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+  }
+
+  @override
   Future<Uint8List> synthesizeAudio(String text) async {
     return Uint8List.fromList([1, 2, 3, 4]);
   }

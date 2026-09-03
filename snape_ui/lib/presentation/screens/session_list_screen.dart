@@ -9,6 +9,7 @@ import '../../domain/models/session.dart';
 import '../../domain/models/space.dart';
 import '../state/chat_notifier.dart';
 import '../state/session_notifier.dart';
+import '../widgets/rename_session_dialog.dart';
 import '../widgets/session_list_item.dart';
 import 'chat_screen.dart';
 
@@ -62,6 +63,29 @@ class _SessionListScreenState extends ConsumerState<SessionListScreen> {
           builder: (_) => const ChatScreen(),
         ),
       );
+    }
+  }
+
+  Future<void> _renameSession(SessionModel session) async {
+    final newTitle = await RenameSessionDialog.show(
+      context,
+      currentTitle: session.title,
+    );
+    if (newTitle != null &&
+        newTitle.isNotEmpty &&
+        newTitle != session.title &&
+        mounted) {
+      final success = await ref
+          .read(sessionProvider.notifier)
+          .renameSession(session.id, newTitle);
+      if (!success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to rename session'),
+            backgroundColor: AppColors.statusError,
+          ),
+        );
+      }
     }
   }
 
@@ -201,6 +225,7 @@ class _SessionListScreenState extends ConsumerState<SessionListScreen> {
           session: session,
           isSelected: isSelected,
           onTap: () => _openSession(session),
+          onRename: () => _renameSession(session),
           onDelete: () {
             ref.read(sessionProvider.notifier).deleteSession(session.id);
           },

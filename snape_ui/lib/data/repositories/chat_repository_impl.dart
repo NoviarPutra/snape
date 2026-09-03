@@ -31,6 +31,11 @@ class ChatRepositoryImpl implements ChatRepository {
   }
 
   @override
+  Future<SessionModel> updateSessionTitle(String sessionId, String title) {
+    return _remoteDataSource.updateSessionTitle(sessionId, title);
+  }
+
+  @override
   Future<List<ChatMessage>> getSessionHistory(String sessionId) {
     return _remoteDataSource.getSessionMessages(sessionId);
   }

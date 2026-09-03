@@ -4,8 +4,10 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/services/speech_service.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_radii.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_typography.dart';
+import '../../domain/models/session.dart';
 import '../state/chat_notifier.dart';
 import '../state/providers.dart';
 import '../state/session_notifier.dart';
@@ -15,6 +17,7 @@ import '../widgets/connection_status_banner.dart';
 import '../widgets/materials_panel.dart';
 import '../widgets/memory_drawer.dart';
 import '../widgets/message_bubble.dart';
+import '../widgets/rename_session_dialog.dart';
 import '../widgets/session_drawer.dart';
 import 'voice_call_screen.dart';
 
@@ -146,6 +149,29 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     Navigator.of(context).push(VoiceCallScreen.route());
   }
 
+  Future<void> _renameSession(SessionModel session) async {
+    final newTitle = await RenameSessionDialog.show(
+      context,
+      currentTitle: session.title,
+    );
+    if (newTitle != null &&
+        newTitle.isNotEmpty &&
+        newTitle != session.title &&
+        mounted) {
+      final success = await ref
+          .read(sessionProvider.notifier)
+          .renameSession(session.id, newTitle);
+      if (!success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to rename session'),
+            backgroundColor: AppColors.statusError,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   void dispose() {
     _speechService.stopListening();
@@ -192,6 +218,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             await ref.read(chatProvider.notifier).switchSession(newSession.id);
           }
         },
+        onRenameSession: (session) => _renameSession(session),
         onDeleteSession: (sessionId) {
           ref.read(sessionProvider.notifier).deleteSession(sessionId);
         },
@@ -214,43 +241,68 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             }
           },
         ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              currentSession?.title ?? 'Snape Companion',
-              style: AppTypography.titleMedium,
-            ),
-            Row(
+        title: InkWell(
+          onTap: currentSession != null
+              ? () => _renameSession(currentSession)
+              : null,
+          borderRadius: BorderRadius.circular(AppRadii.sm.r),
+          child: Padding(
+            padding: EdgeInsets.symmetric(vertical: 2.h, horizontal: 2.w),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 6.r,
-                  height: 6.r,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: chatState.isSpeaking
-                        ? AppColors.indigoAccent
-                        : (chatState.isConnected
-                            ? AppColors.statusOnline
-                            : (chatState.isReconnecting
-                                ? AppColors.statusReconnecting
-                                : AppColors.statusError)),
-                  ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        currentSession?.title ?? 'Snape Companion',
+                        style: AppTypography.titleMedium,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (currentSession != null) ...[
+                      SizedBox(width: 4.w),
+                      Icon(
+                        Icons.edit_outlined,
+                        size: 14.r,
+                        color: AppColors.slateTertiary,
+                      ),
+                    ],
+                  ],
                 ),
-                SizedBox(width: AppSpacing.xs.w),
-                Text(
-                  chatState.isSpeaking
-                      ? 'Speaking...'
-                      : (chatState.isConnected
-                          ? 'Live Companion'
-                          : (chatState.isReconnecting
-                              ? 'Reconnecting...'
-                              : 'Offline')),
-                  style: AppTypography.caption,
+                Row(
+                  children: [
+                    Container(
+                      width: 6.r,
+                      height: 6.r,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: chatState.isSpeaking
+                            ? AppColors.indigoAccent
+                            : (chatState.isConnected
+                                ? AppColors.statusOnline
+                                : (chatState.isReconnecting
+                                    ? AppColors.statusReconnecting
+                                    : AppColors.statusError)),
+                      ),
+                    ),
+                    SizedBox(width: AppSpacing.xs.w),
+                    Text(
+                      chatState.isSpeaking
+                          ? 'Speaking...'
+                          : (chatState.isConnected
+                              ? 'Live Companion'
+                              : (chatState.isReconnecting
+                                  ? 'Reconnecting...'
+                                  : 'Offline')),
+                      style: AppTypography.caption,
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
+          ),
         ),
         actions: [
           if (isMaterialsEnabled && activeSpace != null)

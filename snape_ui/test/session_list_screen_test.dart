@@ -63,6 +63,17 @@ class FakeChatRepository implements ChatRepository {
   }
 
   @override
+  Future<SessionModel> updateSessionTitle(String sessionId, String title) async {
+    final index = sessions.indexWhere((s) => s.id == sessionId);
+    if (index == -1) {
+      throw Exception('Session not found');
+    }
+    final updated = sessions[index].copyWith(title: title, updatedAt: DateTime.now());
+    sessions[index] = updated;
+    return updated;
+  }
+
+  @override
   Future<List<ChatMessage>> getSessionHistory(String sessionId) async => [];
 
   @override
@@ -280,5 +291,49 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(chatRepo.deletedSessionId, 's1');
+  });
+
+  testWidgets('Tapping rename icon opens RenameSessionDialog and saves updated title',
+      (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() => tester.view.resetPhysicalSize());
+
+    final chatRepo = FakeChatRepository()
+      ..sessions = [
+        SessionModel(
+          id: 's1',
+          title: 'Initial Tech Session',
+          spaceSlug: 'tech',
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ),
+      ];
+
+    await tester.pumpWidget(
+      createSessionListTestApp(chatRepo: chatRepo, space: testSpace),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Initial Tech Session'), findsOneWidget);
+
+    // Tap the rename icon
+    await tester.tap(find.byIcon(Icons.edit_outlined));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Rename Session'), findsOneWidget);
+    expect(find.byType(TextField), findsOneWidget);
+
+    // Enter new session title
+    await tester.enterText(find.byType(TextField), 'Updated Backend Discussion');
+    await tester.pumpAndSettle();
+
+    // Tap Save button
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Rename Session'), findsNothing);
+    expect(find.text('Updated Backend Discussion'), findsOneWidget);
+    expect(chatRepo.sessions.first.title, 'Updated Backend Discussion');
   });
 }

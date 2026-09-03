@@ -11,6 +11,7 @@ class SessionListItem extends StatelessWidget {
   final SessionModel session;
   final bool isSelected;
   final VoidCallback onTap;
+  final VoidCallback onRename;
   final VoidCallback onDelete;
 
   const SessionListItem({
@@ -18,6 +19,7 @@ class SessionListItem extends StatelessWidget {
     required this.session,
     required this.isSelected,
     required this.onTap,
+    required this.onRename,
     required this.onDelete,
   });
 
@@ -69,6 +71,15 @@ class SessionListItem extends StatelessWidget {
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              IconButton(
+                icon: Icon(
+                  Icons.edit_outlined,
+                  size: 20.r,
+                  color: AppColors.slateTertiary,
+                ),
+                tooltip: 'Rename Session',
+                onPressed: onRename,
+              ),
               IconButton(
                 icon: Icon(
                   Icons.delete_outline_rounded,

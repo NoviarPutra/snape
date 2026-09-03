@@ -64,6 +64,24 @@ class ChatRemoteDataSource {
     }
   }
 
+  Future<SessionModel> updateSessionTitle(String sessionId, String title) async {
+    final uri = Uri.parse('$_baseHttpUrl/sessions/$sessionId');
+    final response = await _client.patch(
+      uri,
+      headers: AppConfig.defaultHeaders,
+      body: json.encode({
+        'title': title,
+      }),
+    );
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      final Map<String, dynamic> data = json.decode(response.body) as Map<String, dynamic>;
+      return SessionModel.fromJson(data);
+    } else {
+      throw Exception('Failed to update session: ${response.statusCode} ${response.body}');
+    }
+  }
+
   Future<List<ChatMessage>> getSessionMessages(String sessionId) async {
     final uri = Uri.parse('$_baseHttpUrl/sessions/$sessionId');
     final response = await _client.get(uri, headers: AppConfig.defaultHeaders);

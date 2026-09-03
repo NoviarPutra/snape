@@ -61,6 +61,17 @@ class FakeFullChatRepository implements ChatRepository {
   }
 
   @override
+  Future<SessionModel> updateSessionTitle(String sessionId, String title) async {
+    final index = sessions.indexWhere((s) => s.id == sessionId);
+    if (index == -1) {
+      throw Exception('Session not found');
+    }
+    final updated = sessions[index].copyWith(title: title, updatedAt: DateTime.now());
+    sessions[index] = updated;
+    return updated;
+  }
+
+  @override
   Future<List<ChatMessage>> getSessionHistory(String sessionId) async => [];
 
   @override

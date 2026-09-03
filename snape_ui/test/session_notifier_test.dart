@@ -53,6 +53,20 @@ class MockChatRepository implements ChatRepository {
   }
 
   @override
+  Future<SessionModel> updateSessionTitle(String sessionId, String title) async {
+    if (shouldThrow) {
+      throw Exception('Failed to update session');
+    }
+    final index = sessions.indexWhere((s) => s.id == sessionId);
+    if (index == -1) {
+      throw Exception('Session not found');
+    }
+    final updated = sessions[index].copyWith(title: title, updatedAt: DateTime.now());
+    sessions[index] = updated;
+    return updated;
+  }
+
+  @override
   Future<List<ChatMessage>> getSessionHistory(String sessionId) async => [];
 
   @override
@@ -126,6 +140,50 @@ void main() {
       expect(newSession?.spaceSlug, 'tech');
       expect(notifier.state.currentSession?.spaceSlug, 'tech');
       expect(notifier.state.sessions.first.spaceSlug, 'tech');
+    });
+
+    test('renameSession updates active session title and currentSession reactively', () async {
+      await notifier.loadSessions();
+      expect(notifier.state.currentSession?.id, 'sess-1');
+
+      final success = await notifier.renameSession('sess-1', 'Renamed Title 1');
+
+      expect(success, isTrue);
+      expect(notifier.state.sessions.firstWhere((s) => s.id == 'sess-1').title, 'Renamed Title 1');
+      expect(notifier.state.currentSession?.title, 'Renamed Title 1');
+      expect(notifier.state.errorMessage, isNull);
+    });
+
+    test('renameSession updates non-active session without changing currentSession title', () async {
+      await notifier.loadSessions();
+      expect(notifier.state.currentSession?.id, 'sess-1');
+
+      final success = await notifier.renameSession('sess-2', 'Renamed Title 2');
+
+      expect(success, isTrue);
+      expect(notifier.state.sessions.firstWhere((s) => s.id == 'sess-2').title, 'Renamed Title 2');
+      expect(notifier.state.currentSession?.title, 'Session 1');
+    });
+
+    test('renameSession returns false and ignores empty or whitespace-only titles', () async {
+      await notifier.loadSessions();
+
+      final successEmpty = await notifier.renameSession('sess-1', '');
+      final successWhitespace = await notifier.renameSession('sess-1', '   ');
+
+      expect(successEmpty, isFalse);
+      expect(successWhitespace, isFalse);
+      expect(notifier.state.sessions.firstWhere((s) => s.id == 'sess-1').title, 'Session 1');
+    });
+
+    test('renameSession handles repository failure and sets errorMessage', () async {
+      await notifier.loadSessions();
+      repository.shouldThrow = true;
+
+      final success = await notifier.renameSession('sess-1', 'New Title');
+
+      expect(success, isFalse);
+      expect(notifier.state.errorMessage, contains('Failed to rename session'));
     });
   });
 }

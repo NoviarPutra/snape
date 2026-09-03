@@ -63,6 +63,34 @@ class SessionNotifier extends StateNotifier<SessionState> {
     }
   }
 
+  Future<bool> renameSession(String sessionId, String newTitle) async {
+    final trimmed = newTitle.trim();
+    if (trimmed.isEmpty) return false;
+    try {
+      final updatedSession =
+          await _repository.updateSessionTitle(sessionId, trimmed);
+      final updatedList = state.sessions.map((s) {
+        if (s.id == sessionId) {
+          return updatedSession;
+        }
+        return s;
+      }).toList();
+
+      final isCurrent = state.currentSession?.id == sessionId;
+      state = state.copyWith(
+        sessions: updatedList,
+        currentSession: isCurrent ? updatedSession : state.currentSession,
+        clearError: true,
+      );
+      return true;
+    } catch (e) {
+      state = state.copyWith(
+        errorMessage: 'Failed to rename session: $e',
+      );
+      return false;
+    }
+  }
+
   Future<void> deleteSession(String sessionId) async {
     try {
       await _repository.deleteSession(sessionId);
