@@ -1,16 +1,13 @@
-import os
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock, call, patch
-
-import pytest
+from unittest.mock import MagicMock, patch
 
 # Ensure scripts directory is in sys.path
 SCRIPT_DIR = Path(__file__).resolve().parent.parent / "scripts"
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
-import apply_supabase_migration
+import apply_supabase_migration  # noqa: E402
 
 
 def test_apply_migrations_applies_all_when_none_applied(tmp_path: Path) -> None:

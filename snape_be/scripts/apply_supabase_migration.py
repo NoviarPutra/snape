@@ -34,7 +34,9 @@ def get_database_url() -> str:
         if host and password:
             db_url = f"postgresql://{user}:{password}@{host}:{port}/{dbname}?sslmode=require"
         else:
-            print("❌ Error: DATABASE_URL or SUPABASE_DB_PASSWORD is not set in environment or .env.")
+            print(
+                "❌ Error: DATABASE_URL or SUPABASE_DB_PASSWORD is not set in environment or .env."
+            )
             sys.exit(1)
 
     # Ensure synchronous psycopg2 connection string format
@@ -109,7 +111,7 @@ def apply_migrations(
             print(f"Found {len(pending_migrations)} pending migration(s):")
             for migration_file in pending_migrations:
                 print(f"  • Applying {migration_file.name}...")
-                with open(migration_file, "r", encoding="utf-8") as f:
+                with open(migration_file, encoding="utf-8") as f:
                     sql = f.read()
 
                 cur.execute(sql)
