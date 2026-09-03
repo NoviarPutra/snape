@@ -45,8 +45,7 @@ CEFR_LEVEL_GUIDELINES: dict[str, dict[str, str]] = {
         "sentence_length": "8–12 words",
         "lexicon": "1,000–2,000 high-frequency words",
         "grammar": (
-            "Past Simple, going to future, modal can/could, "
-            "basic conjunctions (and, but, because)"
+            "Past Simple, going to future, modal can/could, basic conjunctions (and, but, because)"
         ),
         "passage_type": "Short dialogue or narrative (120–180 words) on routines, hobbies, travel",
         "tone": "Casual, clear, supportive",
@@ -123,15 +122,15 @@ def build_curation_prompt(level: str, topic: str) -> tuple[str, str]:
 
     system_prompt = f"""\
 You are Hermes Materials Curator, an autonomous pedagogical intelligence agent.
-Your mission is to curate a standardized CEFR {norm_level} ({guidelines['name']}) study \
+Your mission is to curate a standardized CEFR {norm_level} ({guidelines["name"]}) study \
 module in clean Markdown format for the Snape learning companion Obsidian vault.
 
 Linguistic Constraints for CEFR {norm_level}:
-- Target Sentence Length: {guidelines['sentence_length']}
-- Vocabulary Scope: {guidelines['lexicon']}
-- Grammar Targets: {guidelines['grammar']}
-- Passage Style: {guidelines['passage_type']}
-- Tone: {guidelines['tone']}
+- Target Sentence Length: {guidelines["sentence_length"]}
+- Vocabulary Scope: {guidelines["lexicon"]}
+- Grammar Targets: {guidelines["grammar"]}
+- Passage Style: {guidelines["passage_type"]}
+- Tone: {guidelines["tone"]}
 
 Document Standards:
 - Produce clean, valid Markdown without wrapping the entire output in extra backtick fences.
@@ -165,7 +164,7 @@ curated_at: "{iso_now}"
 - Provide Structure, Explanation, and 2–3 clear Example sentences.
 
 ## 3. Reading Passage & Dialogue
-- Provide an engaging {guidelines['passage_type']} illustrating the vocabulary and grammar focus.
+- Provide an engaging {guidelines["passage_type"]} illustrating the vocabulary and grammar focus.
 
 ## 4. Comprehension & Usage Check
 - Provide 3 targeted comprehension/application questions.
@@ -176,9 +175,7 @@ curated_at: "{iso_now}"
     return system_prompt, user_prompt
 
 
-def validate_curated_markdown(
-    content: str, expected_level: str | None = None
-) -> tuple[bool, str]:
+def validate_curated_markdown(content: str, expected_level: str | None = None) -> tuple[bool, str]:
     """Validate that curated markdown adheres to the 5-section standard and frontmatter schema."""
     if not content or not content.strip():
         return False, "Content is empty"

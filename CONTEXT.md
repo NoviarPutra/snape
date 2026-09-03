@@ -21,3 +21,7 @@
 - **Hermes Materials Curator (Agent 1)**: Autonomous pedagogical curation agent governed by `hermes-materials-curator.soul.md` that researches, structures, and writes standardized 5-section CEFR-graded study modules into the Obsidian vault.
 - **Curated Learning Module**: Standardized pedagogical Markdown file containing YAML frontmatter, core vocabulary, grammar patterns, natural reading/dialogue passages, comprehension checks, and discussion prompts.
 - **Obsidian Learning Vault**: Hierarchical markdown repository organized by CEFR levels (`English/A1` through `English/C2`) acting as the reference knowledge base for learning materials.
+- **Hermes News Orchestrator (Agent 2)**: Autonomous internet intelligence agent governed by `hermes-news-orchestrator.soul.md` that aggregates, synthesizes, and stores real-time trending topics across 4 domains (`politics`, `general`, `music`, `creator_trends`) into `public.trending_articles`.
+- **Trending Article**: Structured intelligence record comprising title, bulleted digest, "Why It's Trending" rationale, category, source URL, publication timestamp, tags, and engagement metadata.
+- **News & Trends Portal**: Mobile client gateway presenting categorized trending articles with pull-to-refresh sync and live category filtering.
+- **Discussion Bridge**: Dual-action conversation launcher converting trending article context into an instant speaking practice session in English (`english_b2`) or Indonesian (`teknologi`, `psikologi`, etc.).

@@ -83,7 +83,5 @@ def test_apply_migrations_no_pending_does_nothing(tmp_path: Path) -> None:
 
     assert applied == []
     # Verify no DDL or INSERT was executed
-    insert_calls = [
-        c for c in mock_cursor.execute.call_args_list if "INSERT INTO" in str(c)
-    ]
+    insert_calls = [c for c in mock_cursor.execute.call_args_list if "INSERT INTO" in str(c)]
     assert len(insert_calls) == 0

@@ -143,3 +143,39 @@ class UserMemory(Base, TimestampMixin):
 
     def __repr__(self) -> str:
         return f"<UserMemory id={self.id} user_id={self.user_id} category={self.category}>"
+
+
+class TrendingArticle(Base, TimestampMixin):
+    __tablename__ = "trending_articles"
+    __table_args__ = (
+        CheckConstraint(
+            "category IN ('politics', 'general', 'music', 'creator_trends')",
+            name="chk_trending_article_category",
+        ),
+        Index("ix_trending_articles_category", "category"),
+        Index("ix_trending_articles_published_at", "published_at"),
+        Index("ix_trending_articles_category_published", "category", "published_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    category: Mapped[str] = mapped_column(String(32), nullable=False)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    summary: Mapped[str] = mapped_column(Text, nullable=False)
+    source_url: Mapped[str] = mapped_column(String(512), nullable=False)
+    published_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=func.now(),
+        server_default=func.now(),
+        nullable=False,
+    )
+    tags: Mapped[list[str]] = mapped_column(JSON, default=list, server_default="[]", nullable=False)
+    metadata_: Mapped[dict[str, Any]] = mapped_column(
+        "metadata", JSON, default=dict, server_default="{}", nullable=False
+    )
+
+    def __repr__(self) -> str:
+        return f"<TrendingArticle id={self.id} category={self.category} title={self.title[:30]}>"

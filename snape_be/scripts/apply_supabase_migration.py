@@ -75,11 +75,7 @@ def apply_migrations(
 
     parsed = urlparse(db_url)
     raw_host = parsed.hostname
-    host_str = (
-        raw_host.decode("utf-8")
-        if isinstance(raw_host, bytes)
-        else (raw_host or "")
-    )
+    host_str = raw_host.decode("utf-8") if isinstance(raw_host, bytes) else (raw_host or "")
     print(f"Connecting to database host: {host_str}...")
 
     applied: list[str] = []
@@ -99,9 +95,7 @@ def apply_migrations(
             cur.execute("SELECT version FROM public.schema_migrations;")
             applied_versions = {row[0] for row in cur.fetchall()}
 
-            pending_migrations = [
-                f for f in migration_files if f.name not in applied_versions
-            ]
+            pending_migrations = [f for f in migration_files if f.name not in applied_versions]
 
             if not pending_migrations:
                 print("✅ Database is up to date. No new migrations to apply.")

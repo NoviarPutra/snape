@@ -10,6 +10,15 @@ from app.schemas.session import (
     SessionUpdate,
 )
 from app.schemas.space import SpacePublicResponse, SpaceResponse
+from app.schemas.trending import (
+    VALID_TRENDING_CATEGORIES,
+    TrendingArticleBase,
+    TrendingArticleCreate,
+    TrendingArticleResponse,
+    TrendingArticleUpdate,
+    TrendingSyncRequest,
+    TrendingSyncResponse,
+)
 from app.schemas.tts import TTSSynthesizeRequest
 from app.schemas.user import UserBase, UserCreate, UserResponse, UserUpdate
 
@@ -35,4 +44,11 @@ __all__ = [
     "MemoryResponse",
     "MemoryQueryResult",
     "TTSSynthesizeRequest",
+    "VALID_TRENDING_CATEGORIES",
+    "TrendingArticleBase",
+    "TrendingArticleCreate",
+    "TrendingArticleUpdate",
+    "TrendingArticleResponse",
+    "TrendingSyncRequest",
+    "TrendingSyncResponse",
 ]

@@ -254,4 +254,3 @@ async def test_materials_endpoints(client: AsyncClient, tmp_path: Path) -> None:
         assert invalid_cat_res.json()["detail"] == "Material not yet available"
     finally:
         app.dependency_overrides.pop(get_obsidian_service, None)
-

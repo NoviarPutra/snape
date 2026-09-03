@@ -66,9 +66,7 @@ def ws_app(db_session: AsyncSession) -> TestClient:
 
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_chat_pipeline] = lambda: ChatPipeline(
-        llm_service=MockLLMService(
-            canned_tokens=["You ", "went ", "to ", "the ", "market?"]
-        )
+        llm_service=MockLLMService(canned_tokens=["You ", "went ", "to ", "the ", "market?"])
     )
     return TestClient(app)
 
@@ -417,11 +415,7 @@ async def test_deployment_resource_profile() -> None:
     """Verify that process active memory footprint fits in 2 vCPU / 2 GB profile (< 1.2 GB)."""
     # Check max RSS memory (ru_maxrss is in bytes on macOS/Darwin, kilobytes on Linux)
     usage = resource.getrusage(resource.RUSAGE_SELF)
-    max_rss_bytes = (
-        usage.ru_maxrss
-        if sys.platform == "darwin"
-        else usage.ru_maxrss * 1024
-    )
+    max_rss_bytes = usage.ru_maxrss if sys.platform == "darwin" else usage.ru_maxrss * 1024
     max_rss_gb = max_rss_bytes / (1024 * 1024 * 1024)
 
     # Active memory must be < 1.2 GB for the 2 GB RAM profile

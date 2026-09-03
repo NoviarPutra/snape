@@ -109,4 +109,3 @@ async def test_obsidian_service_get_learning_materials(tmp_path: Path) -> None:
     # 5. Disabled service returns None
     disabled_service = ObsidianService(vault_path=str(vault_dir), enabled=False)
     assert await disabled_service.get_learning_materials(level="b2", category="cheatsheet") is None
-

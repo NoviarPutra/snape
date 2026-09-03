@@ -25,9 +25,7 @@ def ws_app(db_session: AsyncSession) -> TestClient:
         yield db_session
 
     app.dependency_overrides[get_db] = override_get_db
-    app.dependency_overrides[get_chat_pipeline] = lambda: ChatPipeline(
-        llm_service=MockLLMService()
-    )
+    app.dependency_overrides[get_chat_pipeline] = lambda: ChatPipeline(llm_service=MockLLMService())
     return TestClient(app)
 
 

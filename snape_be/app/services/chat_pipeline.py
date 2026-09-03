@@ -322,9 +322,7 @@ class ChatPipeline:
                 return
 
             user = await user_service.get_or_create_default_user(db)
-            memories = await self.memory_service.get_memories(
-                db=db, user_id=user.id, limit=10
-            )
+            memories = await self.memory_service.get_memories(db=db, user_id=user.id, limit=10)
 
             await self.obsidian_service.export_session_journal(
                 session_id=session_id,

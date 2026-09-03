@@ -1,7 +1,7 @@
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import ChatMessage, ChatSession, User, UserMemory
+from app.db.models import ChatMessage, ChatSession, TrendingArticle, User, UserMemory
 
 
 @pytest.mark.asyncio
@@ -77,3 +77,31 @@ async def test_user_creation_and_relations(db_session: AsyncSession) -> None:
     assert memory.id is not None
     assert memory.category == "goal"
     assert len(memory.embedding) == 768
+
+
+@pytest.mark.asyncio
+async def test_trending_article_model(db_session: AsyncSession) -> None:
+    """Test TrendingArticle creation, fields, and default values."""
+    article = TrendingArticle(
+        category="creator_trends",
+        title="AI Avatars Take Over Streaming",
+        summary=(
+            "- Virtual streamers gain millions of followers.\n"
+            "- New platforms emerge.\n\n"
+            "Why It's Trending: Generative AI tools are democratizing creation."
+        ),
+        source_url="https://example.com/ai-streamers",
+        tags=["ai", "vtuber", "streaming"],
+        metadata_={"source_name": "TechCrunch", "viral_score": 92},
+    )
+    db_session.add(article)
+    await db_session.commit()
+    await db_session.refresh(article)
+
+    assert article.id is not None
+    assert article.category == "creator_trends"
+    assert article.title == "AI Avatars Take Over Streaming"
+    assert article.tags == ["ai", "vtuber", "streaming"]
+    assert article.metadata_ == {"source_name": "TechCrunch", "viral_score": 92}
+    assert article.published_at is not None
+    assert article.created_at is not None
