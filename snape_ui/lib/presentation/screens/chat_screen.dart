@@ -61,7 +61,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Future<void> _initSessionAndChat() async {
     if (widget.sessionId != null) {
       if (widget.spaceSlug != null) {
-        final spaceState = ref.read(spaceProvider);
+        var spaceState = ref.read(spaceProvider);
+        if (spaceState.spaces.isEmpty) {
+          await ref.read(spaceProvider.notifier).loadSpaces();
+          spaceState = ref.read(spaceProvider);
+        }
         if (spaceState.activeSpace?.slug != widget.spaceSlug) {
           final matching = spaceState.spaces
               .where((s) => s.slug == widget.spaceSlug)
@@ -70,6 +74,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             ref.read(spaceProvider.notifier).selectSpace(matching);
           }
         }
+      }
+
+      if (ref.read(sessionProvider).sessions.isEmpty) {
+        ref.read(sessionProvider.notifier).loadSessions(spaceSlug: widget.spaceSlug);
       }
 
       final chatState = ref.read(chatProvider);
@@ -307,7 +315,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   children: [
                     Flexible(
                       child: Text(
-                        currentSession?.title ?? 'Snape Companion',
+                        currentSession?.title ??
+                            activeSpace?.displayName ??
+                            'Snape Companion',
                         style: AppTypography.titleMedium,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -339,15 +349,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       ),
                     ),
                     SizedBox(width: AppSpacing.xs.w),
-                    Text(
-                      chatState.isSpeaking
-                          ? 'Speaking...'
-                          : (chatState.isConnected
-                              ? 'Live Companion'
-                              : (chatState.isReconnecting
-                                  ? 'Reconnecting...'
-                                  : 'Offline')),
-                      style: AppTypography.caption,
+                    Flexible(
+                      child: Text(
+                        chatState.isSpeaking
+                            ? 'Speaking...'
+                            : (chatState.isConnected
+                                ? 'Live Companion'
+                                : (chatState.isReconnecting
+                                    ? 'Reconnecting...'
+                                    : 'Offline')),
+                        style: AppTypography.caption,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ],
                 ),

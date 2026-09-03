@@ -67,7 +67,16 @@ void main() {
       expect(find.text('Historic AI Treaty Signed in Geneva'), findsOneWidget);
       expect(find.text('45 countries sign the agreement.'), findsOneWidget);
       expect(find.text('Framework emphasizes ethical governance.'), findsOneWidget);
-      expect(find.textContaining('Unprecedented international consensus'), findsOneWidget);
+      expect(
+        find.byWidgetPredicate(
+          (w) =>
+              w is RichText &&
+              w.text
+                  .toPlainText()
+                  .contains('Unprecedented international consensus'),
+        ),
+        findsOneWidget,
+      );
       expect(find.text('#ai'), findsOneWidget);
       expect(find.text('Bahas (English)'), findsOneWidget);
       expect(find.text('Diskusi Santai'), findsOneWidget);

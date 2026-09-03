@@ -335,7 +335,13 @@ void main() {
       expect(find.text('Rename Session'), findsOneWidget);
 
       // Enter new title
-      await tester.enterText(find.byType(TextField), 'Chat Header Renamed');
+      await tester.enterText(
+        find.descendant(
+          of: find.byType(RenameSessionDialog),
+          matching: find.byType(TextField),
+        ),
+        'Chat Header Renamed',
+      );
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Save'));

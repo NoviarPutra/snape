@@ -253,6 +253,9 @@ void main() {
 
   testWidgets('Clicking Bahas (English) creates session and navigates to ChatScreen with preloaded prompt',
       (tester) async {
+    tester.view.physicalSize = const Size(800, 1200);
+    addTearDown(tester.view.resetPhysicalSize);
+
     final trendingRepo = MockTrendingRepository()..articles = sampleArticles;
     final chatRepo = MockChatRepo();
     final spaceRepo = MockSpaceRepo();
@@ -277,6 +280,9 @@ void main() {
 
   testWidgets('Clicking Diskusi Santai creates session and navigates with Indonesian prompt',
       (tester) async {
+    tester.view.physicalSize = const Size(800, 1200);
+    addTearDown(tester.view.resetPhysicalSize);
+
     final trendingRepo = MockTrendingRepository()..articles = sampleArticles;
     final chatRepo = MockChatRepo();
     final spaceRepo = MockSpaceRepo();

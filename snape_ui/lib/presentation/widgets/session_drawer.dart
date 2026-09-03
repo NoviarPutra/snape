@@ -41,9 +41,11 @@ class SessionDrawer extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Practice Sessions',
-                    style: AppTypography.titleMedium,
+                  Expanded(
+                    child: Text(
+                      'Practice Sessions',
+                      style: AppTypography.titleMedium,
+                    ),
                   ),
                   IconButton(
                     icon: Icon(Icons.add_circle_outline, color: AppColors.indigoAccent, size: 24.r),

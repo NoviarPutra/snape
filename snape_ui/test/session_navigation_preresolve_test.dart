@@ -21,6 +21,7 @@ import 'package:snape_ui/presentation/screens/chat_screen.dart';
 import 'package:snape_ui/presentation/screens/level_picker_screen.dart';
 import 'package:snape_ui/presentation/screens/lobby_screen.dart';
 import 'package:snape_ui/presentation/screens/session_list_screen.dart';
+import 'package:snape_ui/presentation/widgets/session_list_item.dart';
 import 'package:snape_ui/presentation/state/providers.dart';
 
 class FakeFullChatRepo implements ChatRepository {
@@ -228,7 +229,7 @@ void main() {
 
       // Verify ChatScreen renders correctly with pre-resolved session title
       expect(find.byType(ChatScreen), findsOneWidget);
-      expect(find.text('B2 – Conversational'), findsOneWidget);
+      expect(find.text('B2 – Conversational'), findsWidgets);
 
       // Verify no extra session was created inside ChatScreen initState
       expect(chatRepo.createSessionCallCount, 0);
@@ -274,7 +275,7 @@ void main() {
 
       // Should be on ChatScreen with tech space
       expect(find.byType(ChatScreen), findsOneWidget);
-      expect(find.text('Teknologi'), findsOneWidget);
+      expect(find.text('Teknologi'), findsWidgets);
       expect(chatRepo.createSessionCallCount, 1);
       expect(chatRepo.connectedSessionId, isNotNull);
       expect(find.text('Jelaskan arsitektur microservices.'), findsOneWidget);
@@ -322,7 +323,7 @@ void main() {
 
       // Should be on ChatScreen using the existing session without creating a new one
       expect(find.byType(ChatScreen), findsOneWidget);
-      expect(find.text('B2 – Conversational'), findsOneWidget);
+      expect(find.text('B2 – Conversational'), findsWidgets);
       expect(chatRepo.createSessionCallCount, 0);
       expect(chatRepo.connectedSessionId, 'b2_existing_session');
     });
@@ -349,7 +350,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Tap on the session item
-      await tester.tap(find.text('B2 – Conversational'));
+      await tester.tap(find.byType(SessionListItem));
       await tester.pumpAndSettle();
 
       // ChatScreen should be displayed with this session

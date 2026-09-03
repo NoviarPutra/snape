@@ -1,13 +1,19 @@
+import 'dart:async';
 import 'package:flutter/material.dart' hide MaterialState;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import '../../core/services/audio_queue_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_radii.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_typography.dart';
+import '../../core/utils/material_parser.dart';
 import '../../domain/models/material_item.dart';
+import '../../domain/models/material_parsed.dart';
 import '../state/material_state.dart';
 import '../state/providers.dart';
+import 'material_section_card.dart';
+import 'material_vocab_card.dart';
 
 class MaterialsPanel extends ConsumerStatefulWidget {
   final String spaceSlug;
@@ -46,6 +52,10 @@ class MaterialsPanel extends ConsumerStatefulWidget {
 class _MaterialsPanelState extends ConsumerState<MaterialsPanel>
     with SingleTickerProviderStateMixin {
   late AnimationController _shimmerController;
+  late final AudioQueueService _audioQueueService;
+  StreamSubscription<bool>? _audioSpeakingSubscription;
+  String? _playingItemId;
+  String? _loadingAudioItemId;
 
   @override
   void initState() {
@@ -54,6 +64,13 @@ class _MaterialsPanelState extends ConsumerState<MaterialsPanel>
       vsync: this,
       duration: const Duration(milliseconds: 1200),
     );
+
+    _audioQueueService = ref.read(audioQueueServiceProvider);
+    _audioSpeakingSubscription = _audioQueueService.isSpeakingStream.listen((speaking) {
+      if (!speaking && mounted) {
+        setState(() => _playingItemId = null);
+      }
+    });
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final notifier = ref.read(materialProvider.notifier);
@@ -64,12 +81,51 @@ class _MaterialsPanelState extends ConsumerState<MaterialsPanel>
 
   @override
   void dispose() {
+    _audioSpeakingSubscription?.cancel();
+    _audioQueueService.stopAndClear();
     _shimmerController.dispose();
     super.dispose();
   }
 
   void _onSelectTab(MaterialCategory category) {
     ref.read(materialProvider.notifier).selectCategory(widget.spaceSlug, category);
+  }
+
+  Future<void> _handlePlayAudio(ParsedMaterialItem item) async {
+    final chatRepository = ref.read(chatRepositoryProvider);
+
+    if (_playingItemId == item.id) {
+      await _audioQueueService.stopAndClear();
+      if (mounted) {
+        setState(() => _playingItemId = null);
+      }
+      return;
+    }
+
+    await _audioQueueService.stopAndClear();
+    if (!mounted) return;
+
+    setState(() {
+      _loadingAudioItemId = item.id;
+      _playingItemId = null;
+    });
+
+    try {
+      final audioBytes = await chatRepository.synthesizeAudio(item.speakableText);
+      if (!mounted) return;
+
+      _audioQueueService.enqueueBytes(audioBytes);
+      setState(() {
+        _loadingAudioItemId = null;
+        _playingItemId = item.id;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loadingAudioItemId = null;
+        _playingItemId = null;
+      });
+    }
   }
 
   @override
@@ -107,9 +163,7 @@ class _MaterialsPanelState extends ConsumerState<MaterialsPanel>
           _buildDragHandle(),
           _buildHeader(context),
           _buildCategoryTabs(state.selectedCategory),
-          Expanded(
-            child: _buildBody(state),
-          ),
+          Expanded(child: _buildBody(state)),
         ],
       ),
     );
@@ -118,8 +172,8 @@ class _MaterialsPanelState extends ConsumerState<MaterialsPanel>
   Widget _buildDragHandle() {
     return Center(
       child: Container(
-        margin: EdgeInsets.only(top: AppSpacing.sm.h, bottom: AppSpacing.xs.h),
-        width: 38.w,
+        margin: EdgeInsets.symmetric(vertical: AppSpacing.xs.h),
+        width: 36.w,
         height: 4.h,
         decoration: BoxDecoration(
           color: AppColors.dividerColor,
@@ -130,6 +184,7 @@ class _MaterialsPanelState extends ConsumerState<MaterialsPanel>
   }
 
   Widget _buildHeader(BuildContext context) {
+    final level = widget.cefrLevel;
     return Padding(
       padding: EdgeInsets.symmetric(
         horizontal: AppSpacing.md.w,
@@ -144,7 +199,7 @@ class _MaterialsPanelState extends ConsumerState<MaterialsPanel>
               borderRadius: BorderRadius.circular(AppRadii.sm.r),
             ),
             child: Icon(
-              Icons.menu_book_rounded,
+              Icons.auto_stories_rounded,
               size: 20.r,
               color: AppColors.indigoAccent,
             ),
@@ -155,37 +210,11 @@ class _MaterialsPanelState extends ConsumerState<MaterialsPanel>
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Flexible(
-                      child: Text(
-                        'Materi Referensi',
-                        style: AppTypography.titleMedium,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    if (widget.cefrLevel != null) ...[
-                      SizedBox(width: AppSpacing.xs.w),
-                      Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: AppSpacing.xs.w * 1.5,
-                          vertical: 2.h,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.indigoAccent,
-                          borderRadius: BorderRadius.circular(AppRadii.xs.r),
-                        ),
-                        child: Text(
-                          widget.cefrLevel!.toUpperCase(),
-                          style: AppTypography.badge.copyWith(
-                            color: Colors.white,
-                            fontSize: 10.sp,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
+                Text(
+                  'Materi Referensi',
+                  style: AppTypography.titleMedium.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
                 if (widget.displayName != null)
                   Text(
@@ -197,13 +226,31 @@ class _MaterialsPanelState extends ConsumerState<MaterialsPanel>
               ],
             ),
           ),
+          if (level != null && level.isNotEmpty)
+            Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: AppSpacing.xs.w,
+                vertical: 2.h,
+              ),
+              decoration: BoxDecoration(
+                color: AppColors.indigoAccent,
+                borderRadius: BorderRadius.circular(AppRadii.xs.r),
+              ),
+              child: Text(
+                level.toUpperCase(),
+                style: AppTypography.badge.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          SizedBox(width: AppSpacing.xs.w),
           IconButton(
             icon: Icon(
               Icons.close_rounded,
               size: 20.r,
-              color: AppColors.slateSecondary,
+              color: AppColors.slateTertiary,
             ),
-            tooltip: 'Tutup',
             onPressed: () => Navigator.of(context).pop(),
           ),
         ],
@@ -212,84 +259,70 @@ class _MaterialsPanelState extends ConsumerState<MaterialsPanel>
   }
 
   Widget _buildCategoryTabs(MaterialCategory selectedCategory) {
-    return Padding(
-      padding: EdgeInsets.symmetric(
+    return Container(
+      margin: EdgeInsets.symmetric(
         horizontal: AppSpacing.md.w,
         vertical: AppSpacing.xs.h,
       ),
-      child: Container(
-        padding: EdgeInsets.all(AppSpacing.xxs.r),
-        decoration: BoxDecoration(
-          color: AppColors.surfaceWarm,
-          borderRadius: BorderRadius.circular(AppRadii.md.r),
-          border: Border.all(color: AppColors.dividerColor),
-        ),
-        child: Row(
-          children: MaterialCategory.values.map((category) {
-            final isSelected = category == selectedCategory;
-            return Expanded(
-              child: GestureDetector(
-                onTap: () => _onSelectTab(category),
-                behavior: HitTestBehavior.opaque,
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  curve: Curves.easeInOut,
-                  padding: EdgeInsets.symmetric(vertical: 8.h),
-                  decoration: BoxDecoration(
-                    color: isSelected ? AppColors.surfaceCard : Colors.transparent,
-                    borderRadius: BorderRadius.circular(AppRadii.sm.r),
-                    boxShadow: isSelected
-                        ? [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.06),
-                              blurRadius: 4,
-                              offset: const Offset(0, 1),
-                            ),
-                          ]
-                        : null,
-                  ),
-                  child: Center(
-                    child: Text(
-                      category.label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 13.sp,
-                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                        color: isSelected
-                            ? AppColors.indigoAccent
-                            : AppColors.slateSecondary,
-                      ),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceWarm,
+        borderRadius: BorderRadius.circular(AppRadii.md.r),
+      ),
+      padding: EdgeInsets.all(3.r),
+      child: Row(
+        children: MaterialCategory.values.map((category) {
+          final isSelected = category == selectedCategory;
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => _onSelectTab(category),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeInOut,
+                padding: EdgeInsets.symmetric(vertical: 8.h),
+                decoration: BoxDecoration(
+                  color: isSelected ? AppColors.surfaceCard : Colors.transparent,
+                  borderRadius: BorderRadius.circular(AppRadii.sm.r),
+                  boxShadow: isSelected
+                      ? [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.06),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ]
+                      : null,
+                ),
+                child: Center(
+                  child: Text(
+                    category.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13.sp,
+                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                      color: isSelected
+                          ? AppColors.indigoAccent
+                          : AppColors.slateSecondary,
                     ),
                   ),
                 ),
               ),
-            );
-          }).toList(),
-        ),
+            ),
+          );
+        }).toList(),
       ),
     );
   }
 
   Widget _buildBody(MaterialState state) {
-    if (state.isLoading) {
-      return _buildShimmerLoading();
-    }
-
-    if (state.errorMessage != null) {
-      return _buildErrorState(state.errorMessage!);
-    }
-
-    if (state.isCurrentCategoryEmpty) {
-      return _buildEmptyState();
-    }
+    if (state.isLoading) return _buildShimmerLoading();
+    if (state.errorMessage != null) return _buildErrorState(state.errorMessage!);
+    if (state.isCurrentCategoryEmpty) return _buildEmptyState();
 
     final content = state.currentContent;
-    if (content == null || content.trim().isEmpty) {
-      return _buildEmptyState();
-    }
+    if (content == null || content.trim().isEmpty) return _buildEmptyState();
 
-    return _buildContent(content);
+    return _buildContent(content, state.selectedCategory);
   }
 
   Widget _buildShimmerLoading() {
@@ -304,42 +337,6 @@ class _MaterialsPanelState extends ConsumerState<MaterialsPanel>
             children: [
               Container(
                 width: 140.w,
-                height: 18.h,
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceWarm.withValues(alpha: opacity),
-                  borderRadius: BorderRadius.circular(AppRadii.xs.r),
-                ),
-              ),
-              SizedBox(height: AppSpacing.md.h),
-              Container(
-                width: double.infinity,
-                height: 12.h,
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceWarm.withValues(alpha: opacity),
-                  borderRadius: BorderRadius.circular(AppRadii.xs.r),
-                ),
-              ),
-              SizedBox(height: AppSpacing.sm.h),
-              Container(
-                width: 260.w,
-                height: 12.h,
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceWarm.withValues(alpha: opacity),
-                  borderRadius: BorderRadius.circular(AppRadii.xs.r),
-                ),
-              ),
-              SizedBox(height: AppSpacing.sm.h),
-              Container(
-                width: double.infinity,
-                height: 12.h,
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceWarm.withValues(alpha: opacity),
-                  borderRadius: BorderRadius.circular(AppRadii.xs.r),
-                ),
-              ),
-              SizedBox(height: AppSpacing.md.h),
-              Container(
-                width: 180.w,
                 height: 16.h,
                 decoration: BoxDecoration(
                   color: AppColors.surfaceWarm.withValues(alpha: opacity),
@@ -349,10 +346,19 @@ class _MaterialsPanelState extends ConsumerState<MaterialsPanel>
               SizedBox(height: AppSpacing.sm.h),
               Container(
                 width: double.infinity,
-                height: 12.h,
+                height: 80.h,
                 decoration: BoxDecoration(
                   color: AppColors.surfaceWarm.withValues(alpha: opacity),
-                  borderRadius: BorderRadius.circular(AppRadii.xs.r),
+                  borderRadius: BorderRadius.circular(AppRadii.md.r),
+                ),
+              ),
+              SizedBox(height: AppSpacing.sm.h),
+              Container(
+                width: double.infinity,
+                height: 80.h,
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceWarm.withValues(alpha: opacity),
+                  borderRadius: BorderRadius.circular(AppRadii.md.r),
                 ),
               ),
             ],
@@ -364,34 +370,22 @@ class _MaterialsPanelState extends ConsumerState<MaterialsPanel>
 
   Widget _buildEmptyState() {
     return Center(
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: AppSpacing.lg.w),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: EdgeInsets.all(AppSpacing.md.r),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceWarm,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.auto_stories_outlined,
-                size: 36.r,
-                color: AppColors.slateMuted,
-              ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.menu_book_outlined,
+            size: 40.r,
+            color: AppColors.slateMuted,
+          ),
+          SizedBox(height: AppSpacing.xs.h),
+          Text(
+            'Materi untuk level ini belum tersedia',
+            style: AppTypography.bodyMedium.copyWith(
+              color: AppColors.slateTertiary,
             ),
-            SizedBox(height: AppSpacing.md.h),
-            Text(
-              'Materi untuk level ini belum tersedia',
-              style: AppTypography.bodyMedium.copyWith(
-                color: AppColors.slateSecondary,
-                fontWeight: FontWeight.w500,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -405,7 +399,7 @@ class _MaterialsPanelState extends ConsumerState<MaterialsPanel>
           children: [
             Container(
               padding: EdgeInsets.all(AppSpacing.sm.r),
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: AppColors.errorBackground,
                 shape: BoxShape.circle,
               ),
@@ -435,10 +429,6 @@ class _MaterialsPanelState extends ConsumerState<MaterialsPanel>
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(AppRadii.sm.r),
                 ),
-                padding: EdgeInsets.symmetric(
-                  horizontal: AppSpacing.md.w,
-                  vertical: AppSpacing.xs.h,
-                ),
               ),
               icon: Icon(Icons.refresh_rounded, size: 16.r),
               label: const Text('Coba Lagi'),
@@ -449,32 +439,41 @@ class _MaterialsPanelState extends ConsumerState<MaterialsPanel>
     );
   }
 
-  Widget _buildContent(String content) {
-    return Container(
-      margin: EdgeInsets.fromLTRB(
+  Widget _buildContent(String content, MaterialCategory category) {
+    final items = MaterialParser.parse(content, category: category);
+    if (items.isEmpty) {
+      return _buildEmptyState();
+    }
+
+    return ListView.separated(
+      padding: EdgeInsets.fromLTRB(
         AppSpacing.md.w,
         AppSpacing.xs.h,
         AppSpacing.md.w,
         AppSpacing.md.h,
       ),
-      padding: EdgeInsets.all(AppSpacing.md.r),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceCard,
-        borderRadius: BorderRadius.circular(AppRadii.md.r),
-        border: Border.all(color: AppColors.dividerColor),
-      ),
-      child: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        child: SelectableText(
-          content,
-          style: TextStyle(
-            fontFamily: 'monospace',
-            fontSize: 13.sp,
-            color: AppColors.slatePrimary,
-            height: 1.55,
-          ),
-        ),
-      ),
+      physics: const BouncingScrollPhysics(),
+      itemCount: items.length,
+      separatorBuilder: (context, index) => SizedBox(height: AppSpacing.sm.h),
+      itemBuilder: (context, index) {
+        final item = items[index];
+        if (item is VocabMaterialItem) {
+          return MaterialVocabCard(
+            item: item,
+            isPlaying: _playingItemId == item.id,
+            isLoadingAudio: _loadingAudioItemId == item.id,
+            onPlay: () => _handlePlayAudio(item),
+          );
+        } else if (item is SectionMaterialItem) {
+          return MaterialSectionCard(
+            item: item,
+            isPlaying: _playingItemId == item.id,
+            isLoadingAudio: _loadingAudioItemId == item.id,
+            onPlay: () => _handlePlayAudio(item),
+          );
+        }
+        return const SizedBox.shrink();
+      },
     );
   }
 }
